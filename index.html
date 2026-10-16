@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#2f2419">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon.svg">
-<title>スト6メモ - Chromeメモ帳プロトタイプ</title>
+<title>スト6メモ - 共有メモ v6</title>
 <style>
 :root{
   --bg:#ebe5d5; --panel:#ebe5d5; --panel2:#e3dccb; --line:#d1c9b8;
@@ -200,7 +200,7 @@ body[data-theme="dark"] .lightbox-close{background:#24262c}
       </div>
       <input class="note-title" id="noteTitle" value="">
       <div class="editor" id="editor" contenteditable="true" spellcheck="false"></div>
-      <div class="hint">メモはチャットの時系列ではなく、1つの文書として自由に編集できます。内容と画面幅はこのChromeブラウザに自動保存されます。</div>
+      <div class="hint">編集内容は端末内に保存されます。共有メモ接続中はチャンネル単位でクラウドにも自動保存されます。</div>
     </div>
   </main>
 </div>
@@ -266,7 +266,7 @@ body[data-theme="dark"] .lightbox-close{background:#24262c}
 <div class="modal-back" id="syncBack">
   <div class="modal sync-modal">
     <h2>スマホ・PC同期</h2>
-    <p>同じアカウントでログインした端末間でメモを同期します。</p>
+    <p>同じアカウントでチャンネルごとに自動同期します。初回だけ、元のメモがあるPCから「PCのメモを初期登録」を押してください。スマホでは押さないでください。</p>
     <label>Supabase URL</label>
     <input type="text" id="syncUrl" placeholder="https://xxxx.supabase.co">
     <label>Publishable key</label>
@@ -280,6 +280,7 @@ body[data-theme="dark"] .lightbox-close{background:#24262c}
       <button id="syncClose">閉じる</button>
       <button id="syncSignUp">アカウント作成</button>
       <button class="primary" id="syncLogin">ログイン</button>
+      <button id="syncInit">PCのメモを初期登録</button>
       <button id="syncPush">クラウドへ保存</button>
       <button id="syncPull">同期を取得</button>
       <button id="syncLogout">ログアウト</button>
@@ -1028,103 +1029,248 @@ document.getElementById("syncClose").onclick=closeSyncSettings;
 document.getElementById("syncLogin").onclick=syncLogin;
 document.getElementById("syncSignUp").onclick=syncSignUp;
 document.getElementById("syncPull").onclick=pullCloud;
-document.getElementById("syncPush").onclick=()=>pushCloud(false);
+document.getElementById("syncPush").onclick=()=>pushCloud();
 document.getElementById("syncLogout").onclick=syncLogout;
+document.getElementById("syncInit").onclick=initializeShared;
 document.getElementById("syncBack").addEventListener("click",e=>{if(e.target.id==="syncBack")closeSyncSettings()});
 
-// 同期設定の保存キーは初期化処理より前に定義する
+// Shared memo v6: per-channel rows, explicit first-device migration and optimistic concurrency.
 const SYNC_CFG_KEY="chromeMemoSyncConfig";
+const SHARED_TABLE="memo_shared_v6";
 let supabaseClient=null, syncSession=null, syncTimer=null, syncPulling=false;
-let cloudDirty=false, cloudSaving=false, cloudQueued=false, cloudRevision=0;
-initSupabase();
-
-document.body.dataset.theme=localStorage.getItem("chromeMemoTheme")||"light";
-function syncCfg(){try{return JSON.parse(localStorage.getItem(SYNC_CFG_KEY)||"null")}catch(e){return null}}
-function setSyncStatus(t){const el=document.getElementById("syncStatus");if(el)el.textContent=t}
+let sharedEnabled=false, sharedBusy=false, sharedTimer=null, sharedPoll=null;
+let sharedVersions=new Map(), sharedBase=new Map(), sharedDirty=new Set(), sharedConflict=new Set();
+let sharedLastStructure="", sharedLastNotes=new Map(), sharedInitialized=false;
+let cloudDirty=false;
+const sharedStatus=()=>document.getElementById('saveState');
+function syncCfg(){try{return JSON.parse(localStorage.getItem(SYNC_CFG_KEY)||'null')}catch(e){return null}}
+function setSyncStatus(t){document.getElementById('syncStatus').textContent=t}
+function showSharedStatus(t){sharedStatus().textContent=t;setSyncStatus(t)}
 function normalizeSupabaseUrl(value){
-  let u=(value||"").trim().replace(/^['"]|['"]$/g,"");
-  if(!u)return "";
-  u=u.replace(/\/+$/," ").trim();
-  u=u.replace(/\/rest\/v1\/?$/i,"");
-  try{
-    const parsed=new URL(u);
-    if(parsed.protocol!=="https:") throw new Error("Supabase URLはhttps://で始めてください");
-    parsed.pathname=parsed.pathname.replace(/\/+$/," ").trim();
-    parsed.search=""; parsed.hash="";
-    return parsed.origin+parsed.pathname;
-  }catch(e){throw new Error("Supabase URLの形式が正しくありません。例：https://xxxxx.supabase.co");}
+  const u=String(value||'').trim().replace(/\/+$/,'');
+  try{const x=new URL(u);if(x.protocol!=='https:')throw 0;return x.origin+x.pathname.replace(/\/+$/,'')}
+  catch(e){throw new Error('Supabase URLは https://xxxxx.supabase.co の形式で入力してください')}
 }
 function initSupabase(cfg){
-  const c=cfg||syncCfg();
-  if(!c?.url||!c?.key){supabaseClient=null;return null;}
-  try{
-    if(!window.supabase || typeof window.supabase.createClient!=="function") throw new Error("Supabaseライブラリを読み込めませんでした。インターネット接続を確認してください。");
-    const url=normalizeSupabaseUrl(c.url);
-    if(!/^sb_publishable_/i.test(c.key) && !/^eyJ/i.test(c.key)) throw new Error("Publishable keyが正しくありません。SupabaseのPublishable keyをそのまま貼り付けてください。");
-    supabaseClient=window.supabase.createClient(url,c.key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
-    supabaseClient.auth.getSession().then(({data})=>{if(!syncSession){syncSession=data.session||null;}if(!syncPulling)setSyncStatus(syncSession?`接続中：${syncSession.user.email}`:"未ログイン")}).catch(e=>setSyncStatus("接続確認失敗："+e.message));
-    if(!supabaseClient.__memoAuthHook){
-      supabaseClient.auth.onAuthStateChange((_e,s)=>{syncSession=s;if(!syncPulling)setSyncStatus(s?`接続中：${s.user.email}`:"未ログイン")});
-      supabaseClient.__memoAuthHook=true;
-    }
-    return supabaseClient;
-  }catch(e){supabaseClient=null;setSyncStatus("設定エラー："+(e?.message||String(e)));return null;}
+ const c=cfg||syncCfg();if(!c?.url||!c?.key)return null;
+ try{
+  supabaseClient=window.supabase.createClient(normalizeSupabaseUrl(c.url),c.key);
+  supabaseClient.auth.getSession().then(({data:d})=>{
+   syncSession=d.session||null;
+   if(syncSession)startShared(false);else setSyncStatus('未ログイン');
+  });
+  return supabaseClient;
+ }catch(e){setSyncStatus('設定エラー：'+e.message);return null}
 }
-async function openSyncSettings(){const c=syncCfg()||{};document.getElementById("syncUrl").value=c.url||"";document.getElementById("syncKey").value=c.key||"";document.getElementById("syncEmail").value=c.email||"";document.getElementById("syncPassword").value="";document.getElementById("syncBack").classList.add("show");setSyncStatus(c.url&&c.key?"入力内容を確認してください":"未接続");}
-function closeSyncSettings(){document.getElementById("syncBack").classList.remove("show")}
 function saveSyncConfig(){
-  let url="";
-  try{url=normalizeSupabaseUrl(document.getElementById("syncUrl").value);}catch(e){setSyncStatus("設定エラー："+e.message);return null;}
-  const c={url,key:document.getElementById("syncKey").value.trim(),email:document.getElementById("syncEmail").value.trim()};
-  localStorage.setItem(SYNC_CFG_KEY,JSON.stringify(c));
-  document.getElementById("syncUrl").value=url;
-  return c;
+ try{
+  const c={url:normalizeSupabaseUrl(document.getElementById('syncUrl').value),key:document.getElementById('syncKey').value.trim(),email:document.getElementById('syncEmail').value.trim()};
+  localStorage.setItem(SYNC_CFG_KEY,JSON.stringify(c));return c;
+ }catch(e){setSyncStatus(e.message);return null}
 }
-async function syncLogin(){const c=saveSyncConfig();if(!c)return;if(!c.url||!c.key||!c.email||!document.getElementById("syncPassword").value){setSyncStatus("URL・key・メール・パスワードを入力してください");return}initSupabase(c);if(!supabaseClient)return;setSyncStatus("ログイン中…");const {data,error}=await supabaseClient.auth.signInWithPassword({email:c.email,password:document.getElementById("syncPassword").value});if(error){setSyncStatus("ログイン失敗："+error.message);return}syncSession=data.session;setSyncStatus("ログイン成功。同期を取得します…");await pullCloud();}
-async function syncSignUp(){const c=saveSyncConfig();if(!c)return;if(!c.url||!c.key||!c.email||!document.getElementById("syncPassword").value){setSyncStatus("URL・key・メール・パスワードを入力してください");return}initSupabase(c);if(!supabaseClient)return;setSyncStatus("アカウント作成中…");const {data,error}=await supabaseClient.auth.signUp({email:c.email,password:document.getElementById("syncPassword").value});if(error){setSyncStatus("作成失敗："+error.message);return}if(data.session){syncSession=data.session;setSyncStatus("作成完了。同期します…");await pushCloud(true)}else setSyncStatus("確認メールを確認してからログインしてください");}
-async function pushCloud(silent=false){
-  if(cloudSaving){cloudQueued=true;return false}
-  if(!supabaseClient||!syncSession){setSyncStatus("クラウド未保存：ログインしてから保存してください");return false}
-  cloudSaving=true;
-  const revision=cloudRevision;
-  try{
-    saveCurrentWithoutCloud();
-    const row={user_id:syncSession.user.id,payload:JSON.parse(JSON.stringify(data)),updated_at:new Date().toISOString()};
-    if(!silent)setSyncStatus("クラウドへ保存中…");
-    const {error}=await supabaseClient.from("memo_state").upsert(row,{onConflict:"user_id"});
-    if(error)throw error;
-    if(revision===cloudRevision)cloudDirty=false;
-    setSyncStatus(cloudDirty?"保存完了。ただし新しい編集が未送信です":"クラウドへ保存しました");
-    return true;
-  }catch(e){cloudDirty=true;setSyncStatus("クラウド保存失敗："+(e?.message||String(e)));return false}
-  finally{cloudSaving=false;if(cloudQueued){cloudQueued=false;if(cloudDirty)queueCloudSync()}}
+async function openSyncSettings(){
+ const c=syncCfg()||{};
+ for(const [id,v] of [['syncUrl',c.url],['syncKey',c.key],['syncEmail',c.email]])document.getElementById(id).value=v||'';
+ document.getElementById('syncPassword').value='';document.getElementById('syncBack').classList.add('show');
+ setSyncStatus(sharedEnabled?'共有メモ接続中':syncSession?'ログイン済み。共有メモを確認してください':'未ログイン');
 }
-function saveCurrentWithoutCloud(){
-  const n=currentNote();if(!n)return;
-  n.title=document.getElementById("noteTitle").value;
-  n.html=plainEditorHtml();
-  localStorage.setItem(KEY,JSON.stringify(data));
+function closeSyncSettings(){document.getElementById('syncBack').classList.remove('show')}
+async function syncLogin(){
+ const c=saveSyncConfig();if(!c)return;
+ initSupabase(c);if(!supabaseClient)return;
+ setSyncStatus('ログイン中…');
+ try{
+  const {data:d,error}=await supabaseClient.auth.signInWithPassword({email:c.email,password:document.getElementById('syncPassword').value});
+  if(error)throw error;syncSession=d;await startShared(true);
+ }catch(e){setSyncStatus('ログイン失敗：'+e.message)}
+}
+async function syncSignUp(){
+ const c=saveSyncConfig();if(!c)return;initSupabase(c);if(!supabaseClient)return;
+ const {data:d,error}=await supabaseClient.auth.signUp({email:c.email,password:document.getElementById('syncPassword').value});
+ if(error){setSyncStatus('登録失敗：'+error.message);return}
+ if(d?.access_token){syncSession=d;await startShared(true)}else setSyncStatus('確認メールを確認してからログインしてください');
+}
+// Request with session refresh. No service-role secret is used in the browser.
+async function sharedRequest(method,path,body,prefer){
+ const cfg=syncCfg();if(!cfg||!syncSession)throw new Error('ログインしてください');
+ const make=async()=>fetch(normalizeSupabaseUrl(cfg.url)+'/rest/v1/'+SHARED_TABLE+path,{
+  method,headers:{apikey:cfg.key,Authorization:'Bearer '+syncSession.access_token,'Content-Type':'application/json',...(prefer?{Prefer:prefer}:{})},
+  ...(body===undefined?{}:{body:JSON.stringify(body)}),cache:'no-store'
+ });
+ let r=await make();
+ if(r.status===401&&syncSession.refresh_token){
+  const x=await fetch(normalizeSupabaseUrl(cfg.url)+'/auth/v1/token?grant_type=refresh_token',{
+   method:'POST',headers:{apikey:cfg.key,'Content-Type':'application/json'},body:JSON.stringify({refresh_token:syncSession.refresh_token})});
+  if(x.ok){syncSession=await x.json();localStorage.setItem('chromeMemoSupabaseSession',JSON.stringify(syncSession));r=await make()}
+ }
+ if(!r.ok){let msg=await r.text();try{const j=JSON.parse(msg);msg=j.message||j.hint||msg}catch(e){}throw new Error('HTTP '+r.status+' '+msg.slice(0,160))}
+ const t=await r.text();return t?JSON.parse(t):null;
+}
+function assignIds(){
+ (data.genres||[]).forEach(g=>{
+  if(!g.id)g.id=crypto.randomUUID();
+  const walk=nodes=>(nodes||[]).forEach(c=>{
+   if(!c.id)c.id=crypto.randomUUID();
+   (c.notes||[]).forEach(n=>{if(!n.id)n.id=crypto.randomUUID()});walk(c.children)
+  });walk(g.categories)
+ });
+}
+function allLocalNotes(){
+ const m=new Map();
+ const walk=nodes=>(nodes||[]).forEach(c=>{(c.notes||[]).forEach(n=>m.set(n.id,n));walk(c.children)});
+ (data.genres||[]).forEach(g=>walk(g.categories));return m;
+}
+function structureSnapshot(){
+ assignIds();
+ return {genres:data.genres.map(g=>({id:g.id,name:g.name,icon:g.icon,categories:JSON.parse(JSON.stringify(g.categories,(k,v)=>k==='html'||k==='title'?undefined:v))}))};
+}
+function noteSnapshot(n){return {title:n.title||'',html:n.html||''}}
+function updateSharedBaseline(){
+ sharedLastStructure=JSON.stringify(structureSnapshot());
+ sharedLastNotes=new Map([...allLocalNotes()].map(([id,n])=>[id,JSON.stringify(noteSnapshot(n))]));
+}
+function detectSharedChanges(){
+ if(!sharedEnabled)return;
+ const structure=JSON.stringify(structureSnapshot());
+ if(structure!==sharedLastStructure)sharedDirty.add('structure');
+ for(const [id,n] of allLocalNotes())if(JSON.stringify(noteSnapshot(n))!==sharedLastNotes.get(id))sharedDirty.add('note:'+id);
+ cloudDirty=sharedDirty.size>0;
+ if(cloudDirty){showSharedStatus(sharedConflict.size?'競合あり：確認が必要':'クラウドへ保存待ち');queueCloudSync()}
+}
+function mergeStructure(remote){
+ // Preserve this device's current editor selection and local-only width.
+ const oldNotes=allLocalNotes(), activeGenreId=data.genres[data.activeGenre]?.id;
+ const activeCategory=data.activeCategoryId,activeNote=data.activeNoteIndex;
+ const incoming=structuredClone(remote.genres||[]);
+ const walk=nodes=>(nodes||[]).forEach(c=>{
+  c.notes=(c.notes||[]).map(n=>({id:n.id,title:oldNotes.get(n.id)?.title||'',html:oldNotes.get(n.id)?.html||''}));walk(c.children)
+ });
+ incoming.forEach(g=>walk(g.categories));data.genres=incoming;
+ const ix=incoming.findIndex(g=>g.id===activeGenreId);data.activeGenre=ix>=0?ix:0;
+ data.activeCategoryId=activeCategory;data.activeNoteIndex=activeNote;
+ normalizeCategoriesAll();
+ if(!findCategory(data.activeCategoryId)){
+  data.activeCategoryId=currentGenre()?.categories?.[0]?.id;data.activeNoteIndex=0;
+ }
+}
+async function fetchSharedRows(){
+ const rows=await sharedRequest('GET','?select=doc_id,payload,version&order=doc_id.asc&limit=10000');
+ return new Map((rows||[]).map(r=>[r.doc_id,r]));
+}
+async function startShared(announce){
+ if(!syncSession)return;
+ try{
+  const rows=await fetchSharedRows();
+  if(!rows.has('structure')){
+   sharedEnabled=false;
+   showSharedStatus('共有メモ未作成。PCで「初期登録」を押してください');return;
+  }
+  // Never silently discard unsaved local edits on initial connection.
+  sharedEnabled=true;sharedInitialized=true;
+  sharedVersions=new Map([...rows].map(([id,r])=>[id,r.version]));
+  sharedBase=new Map([...rows].map(([id,r])=>[id,JSON.stringify(r.payload)]));
+  sharedDirty.clear();sharedConflict.clear();
+  mergeStructure(rows.get('structure').payload);
+  for(const [id,n] of allLocalNotes()){
+   const r=rows.get('note:'+id);if(r)Object.assign(n,r.payload);
+  }
+  updateSharedBaseline();localSaveOnly();renderAll();loadNote();
+  showSharedStatus('共有メモ同期済み');
+  if(sharedPoll)clearInterval(sharedPoll);
+  sharedPoll=setInterval(()=>pollShared().catch(e=>showSharedStatus('同期エラー：'+e.message)),5000);
+ }catch(e){showSharedStatus('共有メモ接続失敗：'+e.message)}
+}
+function localSaveOnly(){try{localStorage.setItem(KEY,JSON.stringify(data))}catch(e){showSharedStatus('端末保存失敗：'+e.message)}}
+async function initializeShared(){
+ if(!syncSession){setSyncStatus('ログインしてください');return}
+ if(!confirm('この端末のメモを共有メモの初期データとして登録します。PCの元メモが表示されていることを確認しましたか？'))return;
+ try{
+  const existing=await fetchSharedRows();
+  if(existing.has('structure')){showSharedStatus('すでに共有メモがあります。初期登録は中止しました');return}
+  saveCurrentWithoutCloud();assignIds();localSaveOnly();
+  const records=[{user_id:syncSession.user.id,doc_id:'structure',payload:structureSnapshot(),version:1},
+   ...[...allLocalNotes()].map(([id,n])=>({user_id:syncSession.user.id,doc_id:'note:'+id,payload:noteSnapshot(n),version:1}))];
+  await sharedRequest('POST','?on_conflict=user_id,doc_id',records,'resolution=ignore-duplicates,return=minimal');
+  await startShared(true);
+ }catch(e){showSharedStatus('初期登録失敗：'+e.message)}
+}
+async function pushSharedOne(id){
+ const isStructure=id==='structure',n=isStructure?null:allLocalNotes().get(id.slice(5));
+ if(!isStructure&&!n){sharedDirty.delete(id);return}
+ const payload=isStructure?structureSnapshot():noteSnapshot(n);
+ const v=sharedVersions.get(id);
+ if(v===undefined){
+  await sharedRequest('POST','?on_conflict=user_id,doc_id',[{user_id:syncSession.user.id,doc_id:id,payload,version:1}],'resolution=ignore-duplicates,return=minimal');
+  const rows=await fetchSharedRows();const row=rows.get(id);
+  if(JSON.stringify(row?.payload)!==JSON.stringify(payload))throw new Error('同じメモが先に登録されました。競合を確認してください');
+  sharedVersions.set(id,row.version);
+ }else{
+  const path='?user_id=eq.'+encodeURIComponent(syncSession.user.id)+'&doc_id=eq.'+encodeURIComponent(id)+'&version=eq.'+v+'&select=doc_id,version';
+  const result=await sharedRequest('PATCH',path,{payload,version:v+1},'return=representation');
+  if(!result?.length)throw new Error('別の端末で更新されました。上書きを停止しました');
+  sharedVersions.set(id,v+1);
+ }
+ sharedBase.set(id,JSON.stringify(payload));
+ if(isStructure)sharedLastStructure=JSON.stringify(payload);
+ else sharedLastNotes.set(id.slice(5),JSON.stringify(payload));
+ sharedDirty.delete(id);
+}
+async function pushCloud(){
+ if(!sharedEnabled){showSharedStatus('共有メモが未接続です。ログイン・初期登録を確認してください');return false}
+ if(sharedBusy)return false;
+ saveCurrentWithoutCloud();detectSharedChanges();
+ if(sharedConflict.size){showSharedStatus('競合あり。別端末の変更を確認してください');return false}
+ sharedBusy=true;
+ try{
+  for(const id of [...sharedDirty]){
+   try{await pushSharedOne(id)}catch(e){sharedConflict.add(id);throw e}
+  }
+  cloudDirty=false;showSharedStatus('クラウド保存済み');return true;
+ }catch(e){showSharedStatus('保存停止：'+e.message);return false}
+ finally{sharedBusy=false}
+}
+function queueCloudSync(){clearTimeout(syncTimer);syncTimer=setTimeout(()=>{if(sharedEnabled&&!sharedBusy&&sharedDirty.size)pushCloud()},1300)}
+async function pollShared(){
+ if(!sharedEnabled||sharedBusy||document.hidden)return;
+ // Flush the visible editor to the in-memory model before comparing remote data.
+ saveCurrentWithoutCloud();detectSharedChanges();
+ const rows=await fetchSharedRows();let changed=false,structureChanged=false;
+ const remoteStructure=rows.get('structure');
+ if(remoteStructure&&remoteStructure.version!==sharedVersions.get('structure')){
+  if(sharedDirty.has('structure')){sharedConflict.add('structure')}
+  else{mergeStructure(remoteStructure.payload);sharedVersions.set('structure',remoteStructure.version);sharedBase.set('structure',JSON.stringify(remoteStructure.payload));structureChanged=true;changed=true}
+ }
+ const notes=allLocalNotes();
+ for(const [id,n] of notes){
+  const key='note:'+id,r=rows.get(key);if(!r)continue;
+  if(r.version===sharedVersions.get(key))continue;
+  if(sharedDirty.has(key)){sharedConflict.add(key);continue}
+  Object.assign(n,r.payload);sharedVersions.set(key,r.version);sharedBase.set(key,JSON.stringify(r.payload));changed=true;
+ }
+ if(changed){updateSharedBaseline();localSaveOnly();if(document.activeElement!==document.getElementById("editor")&&document.activeElement!==document.getElementById("noteTitle")){renderAll();loadNote()}}
+ if(sharedConflict.size)showSharedStatus('競合あり：別端末でも編集されています');
+ else if(!sharedDirty.size)showSharedStatus('共有メモ同期済み');
 }
 async function pullCloud(){
-  if(cloudDirty){setSyncStatus("未保存の変更があります。先に『クラウドへ保存』を押してください");return}
-  if(!supabaseClient){setSyncStatus("Supabaseに接続されていません");return}
-  if(!syncSession){const s=await supabaseClient.auth.getSession();syncSession=s?.data?.session||null}
-  if(!syncSession){setSyncStatus("ログインが必要です");return}
-  if(syncPulling)return;
-  syncPulling=true;setSyncStatus("同期を取得中…");
-  try{
-    const {data:rows,error}=await supabaseClient.from("memo_state").select("payload,updated_at").eq("user_id",syncSession.user.id).maybeSingle();
-    if(error)throw error;
-    if(rows?.payload){data=rows.payload;normalizeCategoriesAll();localStorage.setItem(KEY,JSON.stringify(data));renderAll();loadNote();cloudDirty=false;setSyncStatus("クラウドから同期しました")}
-    else{setSyncStatus("クラウドにデータがありません。保存する場合は『クラウドへ保存』を押してください")}
-  }catch(e){setSyncStatus("同期取得失敗："+(e?.message||String(e)))}finally{syncPulling=false}
+ if(!sharedEnabled){await startShared(true);return}
+ if(sharedDirty.size||sharedConflict.size){showSharedStatus('未保存または競合があるため読み込みを中止しました');return}
+ await pollShared();
+}
+function saveCurrentWithoutCloud(){
+ const n=currentNote();if(!n)return;
+ n.title=document.getElementById('noteTitle').value;n.html=plainEditorHtml();localSaveOnly();
 }
 function normalizeCategoriesAll(){(data.genres||[]).forEach(g=>normalizeCategories(g.categories||[]));if(!data.activeCategoryId){data.activeCategoryId=data.genres[data.activeGenre||0]?.categories?.[0]?.id;data.activeNoteIndex=0}}
-function queueCloudSync(){clearTimeout(syncTimer);syncTimer=setTimeout(()=>{if(cloudDirty)pushCloud()},1200)}
 const _localSave=save;
-save=function(){_localSave();cloudDirty=true;cloudRevision++;queueCloudSync()};
-async function syncLogout(){if(supabaseClient)await supabaseClient.auth.signOut();syncSession=null;setSyncStatus("ログアウトしました")}
-
+save=function(){_localSave();if(sharedEnabled)detectSharedChanges()};
+async function syncLogout(){
+ if(sharedDirty.size){setSyncStatus('未保存の変更があります。ログアウト前に保存してください');return}
+ if(sharedPoll)clearInterval(sharedPoll);sharedEnabled=false;
+ if(supabaseClient)await supabaseClient.auth.signOut();syncSession=null;showSharedStatus('ログアウトしました');
+}
+// Keep the original editor usable offline. Do not overwrite local data until
+// the user explicitly opts into the new shared workspace.
+initSupabase();
 if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}))}
 normalizeCategories(currentGenre().categories);if(!data.activeCategoryId)data.activeCategoryId=currentGenre().categories[0]?.id;data.activeNoteIndex=data.activeNoteIndex??data.active[1]??0;_localSave();setupResize();renderAll();loadNote();
 </script>
