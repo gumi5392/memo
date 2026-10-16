@@ -149,6 +149,15 @@ body[data-theme="dark"] .channel-delete-row input{accent-color:#5865f2}
 body[data-theme="dark"] .memo-channel-link:hover{color:#fff}
 body[data-theme="dark"] .lightbox-close{background:#24262c}
 
+
+/* iPhone Safari: allow the note pane to become a real touch scroll container */
+@media (max-width:800px) {
+  html, body { height:100%; }
+  .app { height:100vh; height:100dvh; min-height:0; }
+  .main { min-height:0; overflow:hidden; }
+  .editor-wrap { min-height:0; overflow-y:auto; overflow-x:hidden; -webkit-overflow-scrolling:touch; overscroll-behavior-y:contain; touch-action:pan-y; }
+  .editor { touch-action:pan-y; }
+}
 </style>
 </head>
 <body>
