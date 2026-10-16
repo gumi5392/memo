@@ -280,6 +280,7 @@ body[data-theme="dark"] .lightbox-close{background:#24262c}
       <button id="syncClose">閉じる</button>
       <button id="syncSignUp">アカウント作成</button>
       <button class="primary" id="syncLogin">ログイン</button>
+      <button id="syncPush">クラウドへ保存</button>
       <button id="syncPull">同期を取得</button>
       <button id="syncLogout">ログアウト</button>
     </div>
@@ -1027,12 +1028,14 @@ document.getElementById("syncClose").onclick=closeSyncSettings;
 document.getElementById("syncLogin").onclick=syncLogin;
 document.getElementById("syncSignUp").onclick=syncSignUp;
 document.getElementById("syncPull").onclick=pullCloud;
+document.getElementById("syncPush").onclick=()=>pushCloud(false);
 document.getElementById("syncLogout").onclick=syncLogout;
 document.getElementById("syncBack").addEventListener("click",e=>{if(e.target.id==="syncBack")closeSyncSettings()});
 
 // 同期設定の保存キーは初期化処理より前に定義する
 const SYNC_CFG_KEY="chromeMemoSyncConfig";
 let supabaseClient=null, syncSession=null, syncTimer=null, syncPulling=false;
+let cloudDirty=false, cloudSaving=false, cloudQueued=false, cloudRevision=0;
 initSupabase();
 
 document.body.dataset.theme=localStorage.getItem("chromeMemoTheme")||"light";
@@ -1079,16 +1082,51 @@ function saveSyncConfig(){
 }
 async function syncLogin(){const c=saveSyncConfig();if(!c)return;if(!c.url||!c.key||!c.email||!document.getElementById("syncPassword").value){setSyncStatus("URL・key・メール・パスワードを入力してください");return}initSupabase(c);if(!supabaseClient)return;setSyncStatus("ログイン中…");const {data,error}=await supabaseClient.auth.signInWithPassword({email:c.email,password:document.getElementById("syncPassword").value});if(error){setSyncStatus("ログイン失敗："+error.message);return}syncSession=data.session;setSyncStatus("ログイン成功。同期を取得します…");await pullCloud();}
 async function syncSignUp(){const c=saveSyncConfig();if(!c)return;if(!c.url||!c.key||!c.email||!document.getElementById("syncPassword").value){setSyncStatus("URL・key・メール・パスワードを入力してください");return}initSupabase(c);if(!supabaseClient)return;setSyncStatus("アカウント作成中…");const {data,error}=await supabaseClient.auth.signUp({email:c.email,password:document.getElementById("syncPassword").value});if(error){setSyncStatus("作成失敗："+error.message);return}if(data.session){syncSession=data.session;setSyncStatus("作成完了。同期します…");await pushCloud(true)}else setSyncStatus("確認メールを確認してからログインしてください");}
-async function pushCloud(silent=false){if(!supabaseClient||!syncSession)return;try{const row={user_id:syncSession.user.id,payload:data,updated_at:new Date().toISOString()};const {error}=await supabaseClient.from("memo_state").upsert(row,{onConflict:"user_id"});if(error)throw error;if(!silent)setSyncStatus("クラウド保存済み")}catch(e){setSyncStatus("同期保存失敗："+e.message)}}
-async function pullCloud(){if(!supabaseClient){setSyncStatus("Supabaseに接続されていません");return}if(!syncSession){const s=await supabaseClient.auth.getSession();syncSession=s?.data?.session||null}if(!syncSession){setSyncStatus("ログインが必要です");return}if(syncPulling)return;syncPulling=true;setSyncStatus("同期を取得中…");try{const {data:rows,error}=await supabaseClient.from("memo_state").select("payload,updated_at").eq("user_id",syncSession.user.id).maybeSingle();if(error)throw error;if(rows?.payload){data=rows.payload;normalizeCategoriesAll();localStorage.setItem(KEY,JSON.stringify(data));renderAll();loadNote();setSyncStatus("クラウドから同期しました")}else{await pushCloud(true);setSyncStatus("クラウドに初回保存しました")}}catch(e){setSyncStatus("同期取得失敗："+e.message)}finally{syncPulling=false}}
+async function pushCloud(silent=false){
+  if(cloudSaving){cloudQueued=true;return false}
+  if(!supabaseClient||!syncSession){setSyncStatus("クラウド未保存：ログインしてから保存してください");return false}
+  cloudSaving=true;
+  const revision=cloudRevision;
+  try{
+    saveCurrentWithoutCloud();
+    const row={user_id:syncSession.user.id,payload:JSON.parse(JSON.stringify(data)),updated_at:new Date().toISOString()};
+    if(!silent)setSyncStatus("クラウドへ保存中…");
+    const {error}=await supabaseClient.from("memo_state").upsert(row,{onConflict:"user_id"});
+    if(error)throw error;
+    if(revision===cloudRevision)cloudDirty=false;
+    setSyncStatus(cloudDirty?"保存完了。ただし新しい編集が未送信です":"クラウドへ保存しました");
+    return true;
+  }catch(e){cloudDirty=true;setSyncStatus("クラウド保存失敗："+(e?.message||String(e)));return false}
+  finally{cloudSaving=false;if(cloudQueued){cloudQueued=false;if(cloudDirty)queueCloudSync()}}
+}
+function saveCurrentWithoutCloud(){
+  const n=currentNote();if(!n)return;
+  n.title=document.getElementById("noteTitle").value;
+  n.html=plainEditorHtml();
+  localStorage.setItem(KEY,JSON.stringify(data));
+}
+async function pullCloud(){
+  if(cloudDirty){setSyncStatus("未保存の変更があります。先に『クラウドへ保存』を押してください");return}
+  if(!supabaseClient){setSyncStatus("Supabaseに接続されていません");return}
+  if(!syncSession){const s=await supabaseClient.auth.getSession();syncSession=s?.data?.session||null}
+  if(!syncSession){setSyncStatus("ログインが必要です");return}
+  if(syncPulling)return;
+  syncPulling=true;setSyncStatus("同期を取得中…");
+  try{
+    const {data:rows,error}=await supabaseClient.from("memo_state").select("payload,updated_at").eq("user_id",syncSession.user.id).maybeSingle();
+    if(error)throw error;
+    if(rows?.payload){data=rows.payload;normalizeCategoriesAll();localStorage.setItem(KEY,JSON.stringify(data));renderAll();loadNote();cloudDirty=false;setSyncStatus("クラウドから同期しました")}
+    else{setSyncStatus("クラウドにデータがありません。保存する場合は『クラウドへ保存』を押してください")}
+  }catch(e){setSyncStatus("同期取得失敗："+(e?.message||String(e)))}finally{syncPulling=false}
+}
 function normalizeCategoriesAll(){(data.genres||[]).forEach(g=>normalizeCategories(g.categories||[]));if(!data.activeCategoryId){data.activeCategoryId=data.genres[data.activeGenre||0]?.categories?.[0]?.id;data.activeNoteIndex=0}}
-function queueCloudSync(){clearTimeout(syncTimer);syncTimer=setTimeout(()=>pushCloud(),700)}
+function queueCloudSync(){clearTimeout(syncTimer);syncTimer=setTimeout(()=>{if(cloudDirty)pushCloud()},1200)}
 const _localSave=save;
-save=function(){_localSave();queueCloudSync()};
+save=function(){_localSave();cloudDirty=true;cloudRevision++;queueCloudSync()};
 async function syncLogout(){if(supabaseClient)await supabaseClient.auth.signOut();syncSession=null;setSyncStatus("ログアウトしました")}
 
 if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}))}
-normalizeCategories(currentGenre().categories);if(!data.activeCategoryId)data.activeCategoryId=currentGenre().categories[0]?.id;data.activeNoteIndex=data.activeNoteIndex??data.active[1]??0;save();setupResize();renderAll();loadNote();
+normalizeCategories(currentGenre().categories);if(!data.activeCategoryId)data.activeCategoryId=currentGenre().categories[0]?.id;data.activeNoteIndex=data.activeNoteIndex??data.active[1]??0;_localSave();setupResize();renderAll();loadNote();
 </script>
 </body>
 </html>
