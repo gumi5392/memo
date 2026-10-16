@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#2f2419">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon.svg">
-<title>スト6メモ - 共有メモ v6</title>
+<title>メモ帳</title>
 <style>
 :root{
   --bg:#ebe5d5; --panel:#ebe5d5; --panel2:#e3dccb; --line:#d1c9b8;
@@ -158,9 +158,39 @@ body[data-theme="dark"] .lightbox-close{background:#24262c}
   .editor-wrap { min-height:0; overflow-y:auto; overflow-x:hidden; -webkit-overflow-scrolling:touch; overscroll-behavior-y:contain; touch-action:pan-y; }
   .editor { touch-action:pan-y; }
 }
+/* Hide the entire memo UI until a live, authorized cloud read has succeeded. */
+body:not(.auth-ready) .app{visibility:hidden;pointer-events:none}
+.auth-gate{position:fixed;inset:0;z-index:200;background:#ebe5d5;color:#171512;display:flex;align-items:center;justify-content:center;padding:18px;overflow:auto}
+body.auth-ready .auth-gate{display:none}
+.auth-panel{width:min(440px,100%);background:#f4efe4;border:1px solid #c8c0b0;border-radius:14px;padding:24px;box-shadow:0 16px 42px #2f24192b}
+.auth-panel h1{font-size:24px;margin:0 0 8px}.auth-panel p{font-size:13px;line-height:1.7;color:#5d564d}
+.auth-panel label{display:block;margin:14px 0 5px;font-size:13px}
+.auth-panel input{display:block;width:100%;padding:11px;border:1px solid #c8c0b0;border-radius:7px;background:#fffdf8;color:#171512;font:inherit}
+.auth-panel button{width:100%;margin-top:18px;padding:12px;background:#0b8060;color:#fff;border:0;border-radius:8px;font-weight:700;cursor:pointer}
+.auth-panel button:disabled{opacity:.6;cursor:wait}.auth-panel details{margin-top:14px;font-size:12px;color:#665f55}
+.auth-panel .gate-status{white-space:pre-wrap;margin-top:12px;font-size:13px;line-height:1.6;min-height:20px}
+body[data-theme="dark"] .auth-gate{background:#111214;color:#e8e9ed}
+body[data-theme="dark"] .auth-panel{background:#202126;border-color:#353841}
+body[data-theme="dark"] .auth-panel p,body[data-theme="dark"] .auth-panel details{color:#b8bbc4}
 </style>
 </head>
 <body>
+<div class="auth-gate" id="authGate">
+  <div class="auth-panel">
+    <h1>メモ帳</h1>
+    <p>メモを表示するには、Supabaseアカウントでログインしてください。</p>
+    <label for="gateEmail">メールアドレス</label>
+    <input type="email" id="gateEmail" autocomplete="username">
+    <label for="gatePassword">パスワード</label>
+    <input type="password" id="gatePassword" autocomplete="current-password">
+    <details id="gateConfig"><summary>初回のみ：Supabase接続設定</summary>
+      <label for="gateUrl">Supabase URL</label><input id="gateUrl" type="text" placeholder="https://xxxxx.supabase.co">
+      <label for="gateKey">Publishable key</label><input id="gateKey" type="text" placeholder="sb_publishable_...">
+    </details>
+    <button id="gateLogin">ログインしてメモを開く</button>
+    <div role="status" aria-live="polite" class="gate-status" id="gateStatus">ログイン状態を確認しています…</div>
+  </div>
+</div>
 <div class="app" id="app">
   <aside class="servers">
     <div id="genres"></div>
@@ -1045,7 +1075,9 @@ let cloudDirty=false;
 const sharedStatus=()=>document.getElementById('saveState');
 function syncCfg(){try{return JSON.parse(localStorage.getItem(SYNC_CFG_KEY)||'null')}catch(e){return null}}
 function setSyncStatus(t){document.getElementById('syncStatus').textContent=t}
-function showSharedStatus(t){sharedStatus().textContent=t;setSyncStatus(t)}
+function showSharedStatus(t){sharedStatus().textContent=t;setSyncStatus(t);if(!document.body.classList.contains('auth-ready'))document.getElementById('gateStatus').textContent=t}
+function unlockMemo(){document.body.classList.add('auth-ready');document.getElementById('gateStatus').textContent='';document.getElementById('gatePassword').value='';closeSyncSettings()}
+function lockMemo(msg){document.body.classList.remove('auth-ready');document.getElementById('gateStatus').textContent=msg||'ログインしてください'}
 function normalizeSupabaseUrl(value){
   const u=String(value||'').trim().replace(/\/+$/,'');
   try{const x=new URL(u);if(x.protocol!=='https:')throw 0;return x.origin+x.pathname.replace(/\/+$/,'')}
@@ -1057,7 +1089,7 @@ function initSupabase(cfg){
   supabaseClient=window.supabase.createClient(normalizeSupabaseUrl(c.url),c.key);
   supabaseClient.auth.getSession().then(({data:d})=>{
    syncSession=d.session||null;
-   if(syncSession)startShared(false);else setSyncStatus('未ログイン');
+   if(syncSession)startShared(false);else {setSyncStatus('未ログイン');lockMemo('ログインしてください')}
   });
   return supabaseClient;
  }catch(e){setSyncStatus('設定エラー：'+e.message);return null}
@@ -1176,6 +1208,7 @@ async function startShared(announce){
   }
   updateSharedBaseline();localSaveOnly();renderAll();loadNote();
   showSharedStatus('共有メモ同期済み');
+  unlockMemo();
   if(sharedPoll)clearInterval(sharedPoll);
   sharedPoll=setInterval(()=>pollShared().catch(e=>showSharedStatus('同期エラー：'+e.message)),5000);
  }catch(e){showSharedStatus('共有メモ接続失敗：'+e.message)}
@@ -1266,10 +1299,34 @@ save=function(){_localSave();if(sharedEnabled)detectSharedChanges()};
 async function syncLogout(){
  if(sharedDirty.size){setSyncStatus('未保存の変更があります。ログアウト前に保存してください');return}
  if(sharedPoll)clearInterval(sharedPoll);sharedEnabled=false;
- if(supabaseClient)await supabaseClient.auth.signOut();syncSession=null;showSharedStatus('ログアウトしました');
+ if(supabaseClient)await supabaseClient.auth.signOut();syncSession=null;lockMemo('ログアウトしました');showSharedStatus('ログアウトしました');
 }
-// Keep the original editor usable offline. Do not overwrite local data until
-// the user explicitly opts into the new shared workspace.
+// Login screen: existing config is stored only on the current device.
+const gateCfg=syncCfg()||{};
+document.getElementById('gateEmail').value=gateCfg.email||'';
+document.getElementById('gateUrl').value=gateCfg.url||'';
+document.getElementById('gateKey').value=gateCfg.key||'';
+if(!gateCfg.url||!gateCfg.key)document.getElementById('gateConfig').open=true;
+document.getElementById('gateLogin').onclick=async()=>{
+ const btn=document.getElementById('gateLogin');if(btn.disabled)return;
+ const email=document.getElementById('gateEmail').value.trim();
+ const pw=document.getElementById('gatePassword').value;
+ const url=document.getElementById('gateUrl').value.trim();
+ const key=document.getElementById('gateKey').value.trim();
+ if(!email||!pw||!url||!key){lockMemo('メール・パスワード・接続設定を入力してください');document.getElementById('gateConfig').open=true;return}
+ btn.disabled=true;lockMemo('ログイン中…');
+ try{
+  document.getElementById('syncUrl').value=url;
+  document.getElementById('syncKey').value=key;
+  document.getElementById('syncEmail').value=email;
+  document.getElementById('syncPassword').value=pw;
+  await syncLogin();
+  if(!sharedEnabled)lockMemo(document.getElementById('syncStatus').textContent);
+ }catch(e){lockMemo('ログイン失敗：'+e.message)}
+ finally{document.getElementById('syncPassword').value='';btn.disabled=false}
+};
+document.getElementById('gatePassword').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('gateLogin').click()});
+// Never reveal locally cached memo data without a successful cloud authorization.
 initSupabase();
 if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}))}
 normalizeCategories(currentGenre().categories);if(!data.activeCategoryId)data.activeCategoryId=currentGenre().categories[0]?.id;data.activeNoteIndex=data.activeNoteIndex??data.active[1]??0;_localSave();setupResize();renderAll();loadNote();
