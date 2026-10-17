@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#2f2419">
-<link rel="manifest" href="manifest.webmanifest?v=62">
-<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=62">
+<link rel="manifest" href="manifest.webmanifest?v=63">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=63">
 <title>メモ帳</title>
 <style>
 :root{
@@ -210,6 +210,54 @@ body[data-theme="dark"] .toolbar-toggle{background:#2a2c32;color:#e8e9ed;border-
   body.mobile-list .hash{font-size:20px;margin-right:5px}
   body.mobile-list .notes{padding-left:12px}
 }
+
+/* v6.3: the app is viewport sized; the category list and memo have independent scroll containers */
+html,body{height:100%;overscroll-behavior:none}
+.app{height:100vh;height:100dvh;min-height:0;overflow:hidden}
+.servers,.sidebar,.main{min-height:0;max-height:100%;overflow:hidden}
+#genres{display:flex;flex:1 1 auto;min-height:0;flex-direction:column;gap:9px;overflow-y:auto;overflow-x:hidden;scrollbar-width:none}
+#genres::-webkit-scrollbar{display:none}
+.servers{flex-shrink:0}
+.server.settings{flex-shrink:0;margin-top:auto}
+.server.add{flex-shrink:0}
+.sidebar-body{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior-y:contain}
+.editor-wrap{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior-y:contain}
+/* Both the title bar and the editing tools remain on screen while the memo body scrolls. */
+.topbar{flex:0 0 58px}
+.toolbar-shell{position:sticky;top:0;z-index:12;background:var(--bg);padding:5px 0 9px;margin-top:-5px;margin-bottom:10px;isolation:isolate}
+.toolbar{max-height:44dvh;overflow-y:auto;overscroll-behavior:contain}
+.context-menu,.cat-menu,.note-menu{max-width:calc(100vw - 16px);max-height:calc(100dvh - 16px);overflow-y:auto}
+@media(max-width:800px){
+  /* Three panels occupy fixed tracks and move together; panels remain mounted to preserve scroll positions. */
+  .app,body.mobile-list .app{--nav-offset:0px;display:block!important;position:relative;width:100%;height:100vh;height:100dvh;min-width:0!important;overflow:hidden}
+  body.mobile-list .app{--nav-offset:100vw}
+  .app>.servers,.app>.sidebar,.app>.main{position:absolute;top:0;height:100%;max-height:100%;min-height:0;display:flex!important;transition:transform 280ms cubic-bezier(.22,.80,.22,1);will-change:transform}
+  .app>.servers,.app>.sidebar{transform:translate3d(calc(var(--nav-offset) - 100vw),0,0);z-index:2}
+  .app>.servers{left:0;width:68px;flex-direction:column;gap:9px;padding:10px 7px 10px;overflow:hidden}
+  .app>.sidebar{left:68px;width:calc(100% - 68px);flex-direction:column;overflow:hidden}
+  .app>.main{left:0;width:100%;transform:translate3d(var(--nav-offset),0,0);z-index:1;flex-direction:column;overflow:hidden}
+  .app.nav-dragging>.servers,.app.nav-dragging>.sidebar,.app.nav-dragging>.main{transition:none!important}
+  /* Long-press gestures should not highlight or call out the icon text. */
+  .servers .server{touch-action:pan-y;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+  .app>.servers #genres{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;gap:11px;-webkit-overflow-scrolling:touch}
+  .app>.servers .server{width:52px;height:52px;flex:0 0 52px}
+  .app>.servers .server.settings{margin-top:auto;flex-shrink:0}
+  .app>.sidebar .sidebar-head{height:70px;min-height:70px;flex-shrink:0;padding:0 14px}
+  .app>.sidebar .sidebar-title{font-size:21px}
+  .app>.sidebar .sidebar-body{padding:16px 10px 90px;flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch}
+  /* More compact channel lines without shrinking tap targets excessively. */
+  .app>.sidebar .cat-head{height:37px}
+  .app>.sidebar .cat-name{font-size:15px}
+  .app>.sidebar .cat-plus{opacity:1}
+  .app>.sidebar .note{height:35px;font-size:14px;padding:0 8px}
+  .app>.sidebar .hash{font-size:19px;margin-right:4px}
+  .app>.sidebar .notes{padding-left:12px}
+  .app>.main .topbar{height:60px;min-height:60px;flex:0 0 60px}
+  .app>.main .editor-wrap{min-height:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;touch-action:pan-y}
+  .app>.main .toolbar-shell{top:0}
+  .app>.main .editor{touch-action:pan-y}
+}
+@media(max-width:800px) and (prefers-reduced-motion:reduce){.app>.servers,.app>.sidebar,.app>.main{transition-duration:0.01ms!important}}
 </style>
 </head>
 <body>
@@ -510,12 +558,40 @@ function ensureCategoryState(){
 normalizeCategories(currentGenre().categories);
   let c=findCategory(data.activeCategoryId); if(!c){c=currentGenre().categories[0];data.activeCategoryId=c?.id;data.activeNoteIndex=0}
 }
+let mobileGenreSuppressUntil=0;
+function attachMobileGenreLongPress(b,i){
+  let timer=null, start=null, fired=false;
+  const cancel=()=>{if(timer!==null){clearTimeout(timer);timer=null}};
+  b.addEventListener('touchstart',e=>{
+    if(!window.matchMedia('(max-width:800px)').matches||e.touches.length!==1)return;
+    cancel();fired=false;
+    const t=e.touches[0];start={x:t.clientX,y:t.clientY};
+    timer=setTimeout(()=>{
+      timer=null;fired=true;
+      mobileGenreSuppressUntil=performance.now()+1100;
+      if(navigator.vibrate)navigator.vibrate(12);
+      closeAllMenus();
+      openContext(Math.max(72,start.x+24),start.y-12,i);
+    },550);
+  },{passive:true});
+  b.addEventListener('touchmove',e=>{
+    if(!start||!e.touches.length)return;
+    const t=e.touches[0];
+    if(Math.hypot(t.clientX-start.x,t.clientY-start.y)>12)cancel();
+  },{passive:true});
+  b.addEventListener('touchend',()=>{cancel();start=null},{passive:true});
+  b.addEventListener('touchcancel',()=>{cancel();start=null},{passive:true});
+  b.addEventListener('contextmenu',e=>{
+    if(fired){e.preventDefault();e.stopPropagation();fired=false;}
+  });
+}
 function renderGenres(){
   const box=document.getElementById("genres");box.innerHTML="";
   data.genres.forEach((g,i)=>{
     const b=document.createElement("button");b.className="server"+(i===data.activeGenre?" active":"");b.title=g.name;
     b.innerHTML=g.icon.startsWith("data:")?`<img src="${g.icon}">`:esc(g.icon);
-    b.onclick=()=>{
+    b.onclick=e=>{
+  if(performance.now()<mobileGenreSuppressUntil){e.preventDefault();e.stopPropagation();return;}
   // Clicking the already-selected genre must not rebuild the category tree.
   // Rebuilding here used to make an existing malformed hierarchy look like it
   // had just been created by the click.
@@ -533,6 +609,7 @@ function renderGenres(){
   loadNote();
 };
     b.oncontextmenu=e=>{e.preventDefault();openContext(e.clientX,e.clientY,i)};
+    attachMobileGenreLongPress(b,i);
     box.appendChild(b);
   });
 }
@@ -661,10 +738,20 @@ function renameNote(ci,ni){
   if(v&&v.trim()){currentGenre().categories[ci].notes[ni].title=v.trim();save();renderCategories();loadNote()}
 }
 function openContext(x,y,i){
-  data._contextGenre=i;const m=document.getElementById("contextMenu");m.style.left=x+"px";m.style.top=y+"px";m.classList.add("show");
+  data._contextGenre=i;
+  const m=document.getElementById("contextMenu");m.classList.add("show");
+  const margin=8;
+  m.style.left=Math.max(margin,Math.min(x,window.innerWidth-m.offsetWidth-margin))+"px";
+  m.style.top=Math.max(margin,Math.min(y,window.innerHeight-m.offsetHeight-margin))+"px";
 }
 function closeContext(){document.getElementById("contextMenu").classList.remove("show")}
-function openGenreSettings(x,y){const m=document.getElementById("genreSettingsMenu");m.style.left=x+"px";m.style.top=y+"px";m.classList.add("show")}
+function openGenreSettings(x,y){
+  const m=document.getElementById("genreSettingsMenu");
+  m.classList.add("show");
+  const margin=8;
+  m.style.left=Math.max(margin,Math.min(x,window.innerWidth-m.offsetWidth-margin))+"px";
+  m.style.top=Math.max(margin,Math.min(y,window.innerHeight-m.offsetHeight-margin))+"px";
+}
 function closeGenreSettings(){document.getElementById("genreSettingsMenu").classList.remove("show")}
 function applyWidth(){
   document.querySelector(".app").style.gridTemplateColumns=`72px ${data.sidebarWidth}px 5px minmax(360px,1fr)`;
@@ -1369,32 +1456,81 @@ initSupabase();
 if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}))}
 normalizeCategories(currentGenre().categories);if(!data.activeCategoryId)data.activeCategoryId=currentGenre().categories[0]?.id;data.activeNoteIndex=data.activeNoteIndex??data.active[1]??0;_localSave();setupResize();renderAll();loadNote();
 
-// v6.2 navigation stays on the device; never changes shared note data.
+// v6.3 mobile navigation: horizontal movement tracks the finger and settles with a slide.
+// Screen state is device-only; memo content and shared cloud sync remain unchanged.
 (function(){
   const mobile=()=>window.matchMedia('(max-width:800px)').matches;
+  const app=document.getElementById('app');
   const menu=document.getElementById('mobileMenuBtn');
-  const showList=()=>{if(mobile()){document.activeElement?.blur?.();document.body.classList.add('mobile-list');}};
-  const showMemo=()=>{document.body.classList.remove('mobile-list');};
-  menu.addEventListener('click',showList);
+  let gesture=null;
+  let blockNextClickUntil=0;
+  const isList=()=>document.body.classList.contains('mobile-list');
+  function setView(list){
+    if(!mobile())return;
+    if(list)document.activeElement?.blur?.();
+    document.body.classList.toggle('mobile-list',list);
+  }
+  menu.addEventListener('click',()=>setView(true));
   document.getElementById('categories').addEventListener('click',e=>{
-    if(mobile()&&e.target.closest('.note'))showMemo();
+    if(mobile()&&e.target.closest('.note')&&performance.now()>=blockNextClickUntil)setView(false);
   });
-  // Swipe right from the left edge on memo, or swipe left from the list.
-  let start=null;
-  document.getElementById('app').addEventListener('touchstart',e=>{
-    if(!mobile()||e.touches.length!==1){start=null;return}
-    const t=e.touches[0];start={x:t.clientX,y:t.clientY,list:document.body.classList.contains('mobile-list'),editable:!!e.target.closest('[contenteditable], input, textarea, select')};
+  // This horizontal gesture works anywhere in the memo body, including text areas,
+  // but preserves vertical scrolling and avoids buttons, form controls and media.
+  app.addEventListener('touchstart',e=>{
+    gesture=null;
+    if(!mobile()||e.touches.length!==1||e.target.closest('button, input, textarea, select, video, .media-resize'))return;
+    const t=e.touches[0];
+    gesture={x:t.clientX,y:t.clientY,time:performance.now(),list:isList(),mode:null,last:0};
   },{passive:true});
-  document.getElementById('app').addEventListener('touchend',e=>{
-    if(!start||!mobile()||!e.changedTouches.length)return;
-    const t=e.changedTouches[0],dx=t.clientX-start.x,dy=t.clientY-start.y;
-    if(Math.abs(dx)<85||Math.abs(dx)<Math.abs(dy)*1.4)return;
-    if(!start.list && dx>0 && !start.editable && true)showList();
-    if(start.list && dx<0 && !start.editable)showMemo();
-    start=null;
-  },{passive:true});
-  window.addEventListener('resize',()=>{if(!mobile())showMemo()});
-  // Only the user's chosen folded/unfolded state is stored locally.
+  app.addEventListener('touchmove',e=>{
+    if(!gesture||!mobile()||e.touches.length!==1)return;
+    const t=e.touches[0],dx=t.clientX-gesture.x,dy=t.clientY-gesture.y;
+    if(gesture.mode==='vertical')return;
+    if(!gesture.mode){
+      if(Math.max(Math.abs(dx),Math.abs(dy))<12)return;
+      if(Math.abs(dy)>Math.abs(dx)*0.85){gesture.mode='vertical';return;}
+      // Only right from the memo / left from the list opens the opposite view.
+      if((!gesture.list&&dx<=0)||(gesture.list&&dx>=0)){gesture.mode='vertical';return;}
+      gesture.mode='horizontal';app.classList.add('nav-dragging');
+    }
+    if(gesture.mode!=='horizontal')return;
+    if(e.cancelable)e.preventDefault();
+    const w=app.clientWidth;
+    const offset=Math.max(0,Math.min(w,(gesture.list?w:0)+dx));
+    gesture.last=dx;
+    app.style.setProperty('--nav-offset',offset+'px');
+  },{passive:false});
+  function finishGesture(e,canceled){
+    if(!gesture)return;
+    const g=gesture;gesture=null;
+    if(g.mode!=='horizontal')return;
+    const t=e.changedTouches?.[0];
+    const dx=t?t.clientX-g.x:g.last;
+    const dt=Math.max(1,performance.now()-g.time);
+    const threshold=Math.min(90,Math.max(45,app.clientWidth*0.18));
+    const valid=!canceled&&(Math.abs(dx)>threshold||(Math.abs(dx)>25&&Math.abs(dx)/dt>0.50));
+    // Prevent a completed swipe from accidentally opening a channel or moving the cursor.
+    blockNextClickUntil=performance.now()+350;
+    if(valid)setView(!g.list);
+    // Return control of the offset to CSS: transition proceeds from the last dragged position.
+    app.classList.remove('nav-dragging');
+    app.style.removeProperty('--nav-offset');
+  }
+  app.addEventListener('touchend',e=>finishGesture(e,false),{passive:true});
+  app.addEventListener('touchcancel',e=>finishGesture(e,true),{passive:true});
+  app.addEventListener('click',e=>{
+    if(mobile()&&performance.now()<blockNextClickUntil&&e.target.closest('.note')){
+      e.preventDefault();e.stopImmediatePropagation();
+    }
+  },true);
+  window.addEventListener('resize',()=>{
+    if(!mobile()){
+      document.body.classList.remove('mobile-list');
+      app.classList.remove('nav-dragging');app.style.removeProperty('--nav-offset');
+      gesture=null;
+    }
+  });
+  // The editing tools remain foldable and pinned to the top of the memo scroller.
   const toolbar=document.getElementById('editToolbar'),toggle=document.getElementById('toolbarToggle'),chev=document.getElementById('toolbarChevron');
   const key='memoToolbarExpanded_v62';
   let expanded=localStorage.getItem(key)==='1';
