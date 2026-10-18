@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#2f2419">
-<link rel="manifest" href="manifest.webmanifest?v=65">
-<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=65">
+<link rel="manifest" href="manifest.webmanifest?v=66">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=66">
 <title>メモ帳</title>
 <style>
 :root{
@@ -316,6 +316,50 @@ body[data-theme="dark"] .composer-attach button:hover,body[data-theme="dark"] .c
 body[data-theme="dark"] .app-update-banner{background:#202126;border-color:#353841;color:#e8e9ed}
 body[data-theme="dark"] .app-update-banner #appUpdateBannerDismiss{color:#b8bbc4}
 @media(max-width:800px){.app-update-banner{top:calc(env(safe-area-inset-top) + 8px);font-size:12px}}
+
+/* v6.6: mobile editor vs desktop composer and shared color controls */
+:root{--memo-emerald:#00c896}
+.server.active{outline:3px solid var(--memo-emerald);outline-offset:-2px;box-shadow:0 0 0 1px #ffffff30 inset}
+body[data-theme="dark"] .server.active{outline-color:var(--memo-emerald)}
+.server:not(.add):not(.settings),.server:not(.add):not(.settings).active,
+body[data-theme="dark"] .server:not(.add):not(.settings),body[data-theme="dark"] .server:not(.add):not(.settings).active{background:var(--icon-bg,var(--sidebar-btn))}
+body[data-theme="dark"] .server:not(.add):not(.settings){--sidebar-btn:#1e2025}
+.desktop-only{display:inline-flex}
+.mobile-only{display:none}
+/* Fixed to the composer at the lower-right, independent of the document scroll. */
+.toolbar-shell{position:fixed;top:auto;left:auto;right:16px;bottom:90px;width:min(520px,calc(100vw - 385px));padding:0;margin:0;z-index:38;isolation:auto;background:transparent;pointer-events:none}
+.toolbar-toggle{display:none}
+#editToolbar{position:relative;top:auto;display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:7px;margin:0;background:var(--panel2);padding:10px;border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 30px #0003;max-height:50dvh;overflow:visible;pointer-events:auto}
+#editToolbar.is-folded{display:none}
+#editToolbar .color-trigger{white-space:nowrap}
+.desktop-color-palette[hidden]{display:none!important}
+.desktop-color-palette{position:absolute;bottom:calc(100% + 8px);right:0;width:300px;max-width:calc(100vw - 24px);border:1px solid var(--line);border-radius:14px;padding:13px;background:#f4efe4;box-shadow:0 15px 40px #0004;pointer-events:auto;z-index:95}
+.palette-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:8px}
+.palette-top button{border:0;background:transparent;color:var(--muted);font-size:23px;cursor:pointer}
+.palette-modes{display:flex;gap:16px;margin-bottom:12px;font-size:13px}
+.palette-modes label{display:flex;align-items:center;gap:5px;cursor:pointer}
+.palette-modes input{accent-color:var(--accent)}
+.color-wheel-swatches{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:9px;align-items:center}
+.color-choice{border-radius:50%;aspect-ratio:1;width:100%;min-width:0;max-width:32px;background:var(--color);border:2px solid #fff;box-shadow:0 0 0 1px #978d80;cursor:pointer;display:block}
+.color-choice:focus-visible,.color-choice.is-selected{outline:3px solid var(--memo-emerald);outline-offset:2px}
+.icon-swatches{margin:12px 0 6px}
+.icon-color-reset{border:0;background:transparent;color:var(--muted);text-decoration:underline;font-size:12px;cursor:pointer;margin:6px 0}
+body[data-theme="dark"] .desktop-color-palette{background:#202126;border-color:#3a3c44}
+body[data-theme="dark"] .color-choice{border-color:#202126;box-shadow:0 0 0 1px #777}
+#composerToolsBtn{font-size:20px;font-weight:700}
+@media(max-width:800px){
+  #composerShell{display:none!important}
+  .editor-wrap{padding-bottom:48px!important}
+  .toolbar-shell{position:sticky;top:0;left:auto;right:auto;bottom:auto;width:auto;z-index:12;background:var(--bg);padding:5px 0 9px;margin: -5px 0 10px;pointer-events:auto;isolation:isolate}
+  .toolbar-toggle{display:flex}
+  #editToolbar{justify-content:flex-start;margin:9px 0 0;max-height:44dvh;overflow-y:auto;box-shadow:0 3px 12px #0002;padding:7px;}
+  #editToolbar.is-folded{display:none}
+  #editToolbar input[type=color]{width:34px;height:31px;padding:2px;border:1px solid var(--line);border-radius:6px;background:var(--panel2)}
+  .mobile-only{display:inline-flex}
+  .desktop-only{display:none!important}
+  .desktop-color-palette{display:none!important}
+}
+
 </style>
 </head>
 <body>
@@ -363,44 +407,30 @@ body[data-theme="dark"] .app-update-banner #appUpdateBannerDismiss{color:#b8bbc4
       <span class="spacer"></span><span class="save" id="saveState">保存済み</span>
     </div>
     <div class="editor-wrap">
-      <div class="toolbar-shell" id="toolbarShell"><button type="button" id="toolbarToggle" class="toolbar-toggle" aria-controls="editToolbar" aria-expanded="false"><span>✎ 編集ツール</span><span id="toolbarChevron">▾</span></button><div class="toolbar is-folded" id="editToolbar">
-        <button data-cmd="bold" title="太字"><b>B</b></button>
-        <button data-cmd="italic" title="斜体"><i>I</i></button>
-        <button data-cmd="underline" title="下線"><u>U</u></button>
-        <button data-cmd="strikeThrough" title="取り消し線"><s>S</s></button>
-        <select id="fontSize"><option value="">文字サイズ</option><option value="2">小</option><option value="3">標準</option><option value="5">大</option><option value="7">特大</option></select>
-        <button data-cmd="justifyLeft" title="左揃え">≡</button>
-        <button data-cmd="justifyCenter" title="中央揃え">≣</button>
-        <button data-cmd="justifyRight" title="右揃え">☰</button>
-        <button data-cmd="insertUnorderedList">・ リスト</button>
-        <button data-cmd="insertOrderedList">1. リスト</button>
-        <button data-cmd="formatBlock" data-value="h2">見出し</button>
-        <div class="palette-group" aria-label="文字色">
-          <span class="palette-label">文字色</span>
-          <button class="swatch" type="button" data-fore="#111111" style="--sw:#111111"></button>
-          <button class="swatch" type="button" data-fore="#ffffff" style="--sw:#ffffff"></button>
-          <button class="swatch" type="button" data-fore="#b4232e" style="--sw:#b4232e"></button>
-          <button class="swatch" type="button" data-fore="#ff8c25" style="--sw:#ff8c25"></button>
-          <button class="swatch" type="button" data-fore="#d9b600" style="--sw:#d9b600"></button>
-          <button class="swatch" type="button" data-fore="#4f9f3d" style="--sw:#4f9f3d"></button>
-          <button class="swatch" type="button" data-fore="#2196d3" style="--sw:#2196d3"></button>
-          <button class="swatch" type="button" data-fore="#5865f2" style="--sw:#5865f2"></button>
-          <button class="swatch" type="button" data-fore="#a15ac7" style="--sw:#a15ac7"></button>
+      <div class="toolbar-shell" id="toolbarShell">
+        <button type="button" id="toolbarToggle" class="toolbar-toggle" aria-controls="editToolbar" aria-expanded="false"><span>✎ 編集ツール</span><span id="toolbarChevron">▾</span></button>
+        <div class="toolbar is-folded" id="editToolbar">
+          <button type="button" data-cmd="bold" title="太字"><b>B</b></button>
+          <button type="button" data-cmd="italic" title="斜体"><i>I</i></button>
+          <button type="button" data-cmd="underline" title="下線"><u>U</u></button>
+          <button type="button" data-cmd="strikeThrough" title="取り消し線"><s>S</s></button>
+          <select id="fontSize" aria-label="文字サイズ"><option value="" disabled selected hidden>文字サイズ</option><option value="2">小</option><option value="3">標準</option><option value="5">大</option><option value="7">特大</option></select>
+          <button type="button" class="mobile-only" data-cmd="insertUnorderedList">・ リスト</button>
+          <button type="button" class="mobile-only" data-cmd="insertOrderedList">1. リスト</button>
+          <button type="button" class="mobile-only" data-cmd="formatBlock" data-value="h2">見出し</button>
+          <input type="color" id="textColor" class="mobile-only" title="文字色" value="#171512">
+          <input type="color" id="highlightColor" class="mobile-only" title="背景色" value="#fff9d2">
+          <button type="button" class="mobile-only" id="insertImageBtn">🖼 画像</button>
+          <button type="button" class="mobile-only" id="insertVideoBtn">▶ 動画</button>
+          <button type="button" class="desktop-only color-trigger" id="desktopColorBtn" aria-controls="desktopColorPalette" aria-expanded="false">色 ▾</button>
+          <input type="file" id="imageInput" accept="image/*" hidden><input type="file" id="videoInput" accept="video/*" hidden>
         </div>
-        <div class="palette-group" aria-label="背景色">
-          <span class="palette-label">背景</span>
-          <button class="swatch swatch-ring" type="button" data-hilite="#ffffff" style="--sw:#ffffff"></button>
-          <button class="swatch swatch-ring" type="button" data-hilite="#f1f1f1" style="--sw:#f1f1f1"></button>
-          <button class="swatch swatch-ring" type="button" data-hilite="#fde7a7" style="--sw:#fde7a7"></button>
-          <button class="swatch swatch-ring" type="button" data-hilite="#dff2a6" style="--sw:#dff2a6"></button>
-          <button class="swatch swatch-ring" type="button" data-hilite="#c9ecff" style="--sw:#c9ecff"></button>
-          <button class="swatch swatch-ring" type="button" data-hilite="#e7d9ff" style="--sw:#e7d9ff"></button>
+        <div class="desktop-color-palette" id="desktopColorPalette" hidden>
+          <div class="palette-top"><strong>色を選択</strong><button id="closeDesktopColor" type="button" aria-label="閉じる">×</button></div>
+          <div class="palette-modes"><label><input type="radio" name="desktopColorMode" value="foreColor" checked>文字色</label><label><input type="radio" name="desktopColorMode" value="hiliteColor">背景色</label></div>
+          <div class="color-wheel-swatches" id="desktopColorSwatches"></div>
         </div>
-        <button id="insertImageBtn" style="display:none">🖼 画像</button><button id="insertVideoBtn" style="display:none">▶ 動画</button>
-        <input type="color" id="textColor" title="文字色" style="display:none">
-        <input type="color" id="highlightColor" title="背景色" style="display:none">
-        <input type="file" id="imageInput" accept="image/*" hidden><input type="file" id="videoInput" accept="video/*" hidden>
-      </div></div>
+      </div>
       <input class="note-title" id="noteTitle" value="">
       <div class="editor" id="editor" contenteditable="true" spellcheck="false"></div>
       <div class="hint">編集内容は端末内に保存されます。共有メモ接続中はチャンネル単位でクラウドにも自動保存されます。</div>
@@ -409,15 +439,11 @@ body[data-theme="dark"] .app-update-banner #appUpdateBannerDismiss{color:#b8bbc4
       <div class="composer-bar">
         <button type="button" class="composer-btn" id="composerPlusBtn" aria-label="画像や動画を追加" title="画像や動画を追加">＋</button>
         <input type="text" id="composerInput" class="composer-input" placeholder="メモを追加…">
-        <button type="button" class="composer-btn" id="composerEmojiBtn" aria-label="絵文字" title="絵文字">◉</button>
-        <button type="button" class="composer-btn" id="composerToolsBtn" aria-label="編集ツール" title="編集ツール">○</button>
+        <button type="button" class="composer-btn" id="composerToolsBtn" aria-label="編集ツール" aria-expanded="false" title="編集ツール">✎</button>
       </div>
       <div class="composer-pop composer-attach" id="composerAttachMenu">
         <button type="button" id="composerAddImage">画像を追加</button>
         <button type="button" id="composerAddVideo">動画を追加</button>
-      </div>
-      <div class="composer-pop composer-emoji" id="composerEmojiMenu">
-        <button type="button" data-emoji="😀">😀</button><button type="button" data-emoji="😂">😂</button><button type="button" data-emoji="👍">👍</button><button type="button" data-emoji="🔥">🔥</button><button type="button" data-emoji="✨">✨</button><button type="button" data-emoji="🎮">🎮</button><button type="button" data-emoji="⚠️">⚠️</button><button type="button" data-emoji="✅">✅</button><button type="button" data-emoji="➡️">➡️</button><button type="button" data-emoji="📌">📌</button>
       </div>
     </div>
   </main>
@@ -430,6 +456,10 @@ body[data-theme="dark"] .app-update-banner #appUpdateBannerDismiss{color:#b8bbc4
     <input type="text" id="genreName" placeholder="例：スト6">
     <label>アイコン</label>
     <div class="icon-options" id="iconOptions"></div>
+    <label>アイコンの背景色</label>
+    <div class="color-wheel-swatches icon-swatches" id="iconColorSwatches" aria-label="アイコンの背景色"></div>
+    <button type="button" class="icon-color-reset" id="iconColorReset">標準の色に戻す</button>
+    <p class="modal-help">※画像を使ったアイコンは、画像そのものの色は変わりません。</p>
     <label>画像をアイコンにする</label>
     <label class="file-label">画像を選択<input type="file" id="genreImage" accept="image/*"></label>
     <div class="modal-actions"><button id="cancelGenre">キャンセル</button><button class="primary" id="createGenre">作成</button></div>
@@ -471,7 +501,7 @@ body[data-theme="dark"] .app-update-banner #appUpdateBannerDismiss{color:#b8bbc4
       <button class="theme-option dark" id="themeDark"><span class="preview"><span class="p-side"></span><span class="p-main"></span></span><strong>ダーク</strong><span>これまでの配色</span></button>
     </div>
     <div class="app-update-settings" aria-live="polite">
-      <div class="app-update-heading"><strong>アプリの更新</strong><span id="appBuildLabel">v6.5</span></div>
+      <div class="app-update-heading"><strong>アプリの更新</strong><span id="appBuildLabel">v6.6</span></div>
       <p id="appUpdateStatus">更新情報を確認しています…</p>
       <div class="app-update-actions">
         <button type="button" id="appCheckUpdate">更新を確認</button>
@@ -703,6 +733,11 @@ function renderGenres(){
   data.genres.forEach((g,i)=>{
     const b=document.createElement("button");b.className="server"+(i===data.activeGenre?" active":"");b.title=g.name;
     b.innerHTML=g.icon.startsWith("data:")?`<img src="${g.icon}">`:esc(g.icon);
+    if(g.iconBg && /^#[0-9a-fA-F]{6}$/.test(g.iconBg)){
+      b.style.setProperty('--icon-bg',g.iconBg);
+      const lum=parseInt(g.iconBg.slice(1,3),16)*.299+parseInt(g.iconBg.slice(3,5),16)*.587+parseInt(g.iconBg.slice(5,7),16)*.114;
+      b.style.color=lum>155?'#24211d':'#f4f1e8';
+    }
     b.onclick=e=>{
   if(performance.now()<mobileGenreSuppressUntil){e.preventDefault();e.stopPropagation();return;}
   // Clicking the already-selected genre must not rebuild the category tree.
@@ -1392,7 +1427,7 @@ function allLocalNotes(){
 }
 function structureSnapshot(){
  assignIds();
- return {genres:data.genres.map(g=>({id:g.id,name:g.name,icon:g.icon,categories:JSON.parse(JSON.stringify(g.categories,(k,v)=>k==='html'||k==='title'?undefined:v))}))};
+ return {genres:data.genres.map(g=>({id:g.id,name:g.name,icon:g.icon,iconBg:g.iconBg||null,categories:JSON.parse(JSON.stringify(g.categories,(k,v)=>k==='html'||k==='title'?undefined:v))}))};
 }
 function noteSnapshot(n){return {title:n.title||'',html:n.html||''}}
 function updateSharedBaseline(){
@@ -1585,7 +1620,7 @@ normalizeCategories(currentGenre().categories);if(!data.activeCategoryId)data.ac
     el.style.left=clamp(x,margin,window.innerWidth-w-margin)+'px';
     el.style.top=clamp(y,margin,window.innerHeight-h-margin)+'px';
   }
-  function closeComposerMenus(){ $('#composerAttachMenu')?.classList.remove('show'); $('#composerEmojiMenu')?.classList.remove('show'); }
+  function closeComposerMenus(){ $('#composerAttachMenu')?.classList.remove('show'); }
   const _closeAllMenus=closeAllMenus;
   closeAllMenus=function(){ _closeAllMenus(); closeGenreSettings(); closeComposerMenus(); };
   openContext=function(x,y,i){ data._contextGenre=i; closeAllMenus(); positionMenu($('#contextMenu'),x,y); };
@@ -1611,6 +1646,11 @@ normalizeCategories(currentGenre().categories);if(!data.activeCategoryId)data.ac
   // Shared modal for create/edit memo icon and name.
   let genreModalMode='create', editingGenreIndex=null;
   const genreIcons=['🎮','⚔️','⛏️','🧟','🏍️','💼','📝','📚','🎵','🍳','💡','⭐'];
+  let chosenIconColor=null;
+  const colors=['#ffffff','#000000','#ff0000','#ff8000','#ffff00','#80ff00','#00cc00','#00cc80','#00ffff','#0080ff','#0000ff','#8000ff','#ff00ff','#ff0080'];
+  function renderIconColors(){ const box=$('#iconColorSwatches');box.innerHTML=colors.map((c,i)=>`<button type="button" class="color-choice${chosenIconColor===c?' is-selected':''}" data-icon-bg="${c}" style="--color:${c}" aria-label="色 ${i+1}" title="${c}"></button>`).join(''); }
+  $('#iconColorSwatches').addEventListener('click',e=>{const b=e.target.closest('[data-icon-bg]');if(!b)return;chosenIconColor=b.dataset.iconBg;renderIconColors();});
+  $('#iconColorReset').onclick=()=>{chosenIconColor=null;renderIconColors();};
   function renderIconChoices(selected){
     const box=$('#iconOptions');
     box.innerHTML=genreIcons.map(x=>`<button class="emoji${x===selected?' is-selected':''}" data-icon="${x}">${x}</button>`).join('');
@@ -1627,12 +1667,13 @@ normalizeCategories(currentGenre().categories);if(!data.activeCategoryId)data.ac
       name.value=g?.name||'';
       selectedIcon=(g && !String(g.icon||'').startsWith('data:')) ? g.icon : '🎮';
       pendingImage=(g && String(g.icon||'').startsWith('data:')) ? g.icon : null;
-      renderIconChoices(selectedIcon);
+      chosenIconColor=g?.iconBg||null;
+      renderIconChoices(selectedIcon);renderIconColors();
     }else{
       title.textContent='メモを追加';
       name.value='';
-      selectedIcon='🎮'; pendingImage=null;
-      renderIconChoices(selectedIcon);
+      selectedIcon='🎮'; pendingImage=null; chosenIconColor=null;
+      renderIconChoices(selectedIcon);renderIconColors();
     }
     modal.classList.add('show');
   }
@@ -1642,11 +1683,11 @@ normalizeCategories(currentGenre().categories);if(!data.activeCategoryId)data.ac
     const icon= pendingImage || selectedIcon || '🎮';
     if(genreModalMode==='edit' && editingGenreIndex!==null){
       const g=data.genres[editingGenreIndex]; if(!g) return;
-      g.name=name; g.icon=icon;
+      g.name=name; g.icon=icon; g.iconBg=chosenIconColor;
       save(); closeModal(); renderAll(); loadNote(); return;
     }
     const c={id:crypto.randomUUID(),name:'メモ',open:true,children:[],notes:[{title:'新しいメモ',html:'<p></p>'}]};
-    data.genres.push({name,icon,categories:[c]});
+    data.genres.push({name,icon,iconBg:chosenIconColor,categories:[c]});
     data.activeGenre=data.genres.length-1; data.activeCategoryId=c.id; data.activeNoteIndex=0; data.active=[0,0];
     save(); closeModal(); renderAll(); loadNote();
   };
@@ -1655,10 +1696,36 @@ normalizeCategories(currentGenre().categories);if(!data.activeCategoryId)data.ac
   $('#editGenreIcon').onclick=()=>{ const i=data._contextGenre ?? data.activeGenre; closeContext(); openGenreMetaModal('edit',i); };
   $('#genreRenameFromSettingsBtn').onclick=()=>{ closeGenreSettings(); openGenreRenameModal(data.activeGenre); };
 
-  // Toolbar palettes and toggles.
-  $$('[data-fore]').forEach(b=>b.addEventListener('click',()=>cmd('foreColor',b.dataset.fore)));
-  $$('[data-hilite]').forEach(b=>b.addEventListener('click',()=>cmd('hiliteColor',b.dataset.hilite)));
-  $('#composerToolsBtn').addEventListener('click',()=>$('#toolbarToggle').click());
+  // A single 14-color picker for text and highlighting (desktop only).
+  const palette=$('#desktopColorPalette');
+  const paletteButton=$('#desktopColorBtn');
+  $('#desktopColorSwatches').innerHTML=colors.map((c,i)=>`<button type="button" class="color-choice" data-memo-color="${c}" style="--color:${c}" aria-label="色 ${i+1}" title="${c}"></button>`).join('');
+  const closePalette=()=>{palette.hidden=true;paletteButton.setAttribute('aria-expanded','false');};
+  paletteButton.addEventListener('click',()=>{const open=palette.hidden;palette.hidden=!open;paletteButton.setAttribute('aria-expanded',String(open));});
+  $('#closeDesktopColor').onclick=closePalette;
+  // Keep the text selection from disappearing when a swatch receives a pointer press.
+  let lastEditorRange=null;
+  document.addEventListener('selectionchange',()=>{
+    const sel=window.getSelection();
+    if(sel&&sel.rangeCount&&$('#editor').contains(sel.anchorNode))lastEditorRange=sel.getRangeAt(0).cloneRange();
+  });
+  palette.addEventListener('pointerdown',e=>{if(e.target.closest('[data-memo-color]'))e.preventDefault();});
+  $('#desktopColorSwatches').addEventListener('click',e=>{
+    const b=e.target.closest('[data-memo-color]');if(!b)return;
+    const sel=window.getSelection();
+    if(lastEditorRange){try{sel.removeAllRanges();sel.addRange(lastEditorRange);}catch(e){}}
+    const mode=$('input[name="desktopColorMode"]:checked')?.value||'foreColor';
+    cmd(mode,b.dataset.memoColor);closePalette();
+  });
+  $('#composerToolsBtn').addEventListener('click',()=>{
+    $('#toolbarToggle').click();
+    const open=!$('#editToolbar').classList.contains('is-folded');
+    $('#composerToolsBtn').setAttribute('aria-expanded',String(open));
+    if(!open)closePalette();
+  });
+  document.addEventListener('click',e=>{
+    if(!e.target.closest('#desktopColorPalette,#desktopColorBtn'))closePalette();
+  });
 
   // Composer actions.
   const composerInput=$('#composerInput');
@@ -1666,11 +1733,18 @@ normalizeCategories(currentGenre().categories);if(!data.activeCategoryId)data.ac
   function insertTextFromComposer(){ const v=composerInput.value.trim(); if(!v) return; focusEditorEnd(); document.execCommand('insertHTML',false,`<p>${v.replace(/[&<>]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]))}</p>`); composerInput.value=''; enhanceMedia(); saveCurrent(); }
   composerInput.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); insertTextFromComposer(); closeComposerMenus(); } });
   $('#composerPlusBtn').addEventListener('click',()=>{ const m=$('#composerAttachMenu'); const show=!m.classList.contains('show'); closeComposerMenus(); if(show)m.classList.add('show'); });
-  $('#composerEmojiBtn').addEventListener('click',()=>{ const m=$('#composerEmojiMenu'); const show=!m.classList.contains('show'); closeComposerMenus(); if(show)m.classList.add('show'); });
   $('#composerAddImage').addEventListener('click',()=>{ closeComposerMenus(); $('#imageInput').click(); });
   $('#composerAddVideo').addEventListener('click',()=>{ closeComposerMenus(); $('#videoInput').click(); });
-  $$('#composerEmojiMenu [data-emoji]').forEach(b=>b.addEventListener('click',()=>{ composerInput.value += b.dataset.emoji; composerInput.focus(); }));
   document.addEventListener('click',e=>{ if(!e.target.closest('#composerShell')) closeComposerMenus(); }, true);
+
+  // Closing a popup by tapping outside must not also select the tapped channel/category.
+  document.addEventListener('click',e=>{
+    const opened=$$('.cat-menu.show,.note-menu.show,.context-menu.show');
+    if(!opened.length || e.target.closest('.cat-menu.show,.note-menu.show,.context-menu.show'))return;
+    closeAllMenus();
+    e.preventDefault();
+    e.stopImmediatePropagation();
+  },true);
 
   // Improve mobile swipe sensitivity and slide feel.
   const app=document.getElementById('app');
@@ -1678,7 +1752,7 @@ normalizeCategories(currentGenre().categories);if(!data.activeCategoryId)data.ac
     let gesture=null, blockNextClickUntil=0;
     const mobile=()=>window.matchMedia('(max-width:800px)').matches;
     const isList=()=>document.body.classList.contains('mobile-list');
-    function setView(list){ if(!mobile()) return; if(list) document.activeElement?.blur?.(); document.body.classList.toggle('mobile-list',list); }
+    function setView(list){ if(!mobile()) return; closeAllMenus(); if(list) document.activeElement?.blur?.(); document.body.classList.toggle('mobile-list',list); }
     $('#mobileMenuBtn').onclick=()=>setView(true);
     document.getElementById('categories').addEventListener('click',e=>{ if(mobile() && e.target.closest('.note') && performance.now()>=blockNextClickUntil) setView(false); });
     app.addEventListener('touchstart',e=>{
@@ -1735,7 +1809,7 @@ normalizeCategories(currentGenre().categories);if(!data.activeCategoryId)data.ac
 /* v6.5: PWA update detection + user-initiated safe refresh. */
 (function(){
  'use strict';
- const INSTALLED_BUILD='6.5.0';
+ const INSTALLED_BUILD='6.6.0';
  const intervalMs=10*60*1000;
  const status=document.getElementById('appUpdateStatus');
  const buildLabel=document.getElementById('appBuildLabel');
