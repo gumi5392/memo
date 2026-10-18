@@ -472,6 +472,64 @@ body[data-theme="dark"] .create-name-modal .create-name-error{color:#ff9499}
 .channel-delete-modal .modal-actions{margin-top:15px}
 .safe-dialog-input{font-size:16px}
 @media(max-width:800px){.channel-delete-modal{max-height:calc(var(--memo-mobile-viewport,100dvh) - 24px)}}
+
+/* TEST v6.11.0 — Per-channel scratchpad, separate from the formatted memo. */
+.memo-workspace{display:flex;flex:1 1 auto;min-width:0;min-height:0;overflow:hidden}
+.memo-column{display:flex;flex:1 1 auto;flex-direction:column;min-width:0;min-height:0;overflow:hidden}
+.memo-column>.editor-wrap{flex:1 1 auto;min-height:0;min-width:0;overflow-y:auto}
+.memo-column>.composer-shell{flex:0 0 auto}
+.scratch-open-btn{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);border-radius:8px;background:var(--panel2);font-size:13px;font-weight:650;padding:7px 10px;white-space:nowrap;cursor:pointer}
+.scratch-open-btn:hover{background:var(--hover)}
+.scratch-panel{width:var(--scratch-width,310px);flex:0 0 var(--scratch-width,310px);min-width:0;min-height:0;display:flex;flex-direction:column;border-left:1px solid var(--line);background:var(--panel2);overflow:hidden;transition:width 190ms ease, flex-basis 190ms ease}
+.scratch-panel.scratch-collapsed{width:49px;flex-basis:49px}
+.scratch-header{height:58px;min-height:58px;display:flex;align-items:center;gap:6px;padding:0 10px;border-bottom:1px solid var(--line);background:var(--topbar)}
+.scratch-header-title{min-width:0;flex:1;display:flex;flex-direction:column;gap:1px}
+.scratch-header-title strong{font-size:15px;white-space:nowrap}
+.scratch-header-title span{font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.scratch-fold-btn{flex:0 0 30px;width:30px;height:32px;font-size:24px;line-height:1;background:transparent;border:0;border-radius:7px;cursor:pointer;color:var(--muted)}
+.scratch-fold-btn:hover{background:var(--hover)}
+.scratch-panel.scratch-collapsed .scratch-header{padding:0 8px}
+.scratch-panel.scratch-collapsed .scratch-header-title,.scratch-panel.scratch-collapsed .scratch-content{display:none}
+.scratch-panel.scratch-collapsed .scratch-fold-btn{transform:rotate(180deg)}
+.scratch-content{display:flex;flex:1 1 auto;min-height:0;flex-direction:column;gap:8px;padding:16px 12px 14px}
+.scratch-instruction,.scratch-hint{font-size:12px;color:var(--muted);line-height:1.5}
+.scratch-text{box-sizing:border-box;display:block;width:100%;min-height:0;flex:1 1 auto;resize:none;border:1px solid var(--line);border-radius:9px;padding:13px;background:var(--bg);color:var(--text);font-family:inherit;font-size:15px;line-height:1.75;outline:0;overflow-y:auto;overscroll-behavior-y:contain;-webkit-overflow-scrolling:touch}
+.scratch-text:focus{border-color:var(--accent);box-shadow:0 0 0 2px #0b806022}
+.scratch-text::placeholder{color:var(--muted);opacity:.8}
+.scratch-hint{margin:0}
+.scratch-mobile-menu,.scratch-mobile-back{display:none}
+@media(min-width:801px){
+  .main.scratch-expanded .toolbar-shell{right:calc(var(--scratch-width,310px) + 16px);max-width:calc(100vw - 710px)}
+}
+@media(max-width:800px){
+  .app>.main>.memo-workspace{display:flex;flex:1 1 auto;min-height:0;overflow:visible}
+  .app>.main>.memo-workspace>.memo-column{flex:1 1 auto;min-width:0;min-height:0;height:100%;overflow:hidden}
+  .app>.main>.memo-workspace>.memo-column>.editor-wrap{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding-top:14px}
+  .app>.main>.memo-workspace>.memo-column>.toolbar-shell{display:none!important}
+  .app>.main>.memo-workspace>.scratch-panel{
+    position:absolute;inset:0;z-index:35;width:100%!important;max-width:none;height:100%;max-height:100%;flex:none;
+    border:0;transform:translate3d(100%,0,0);transition:transform 200ms cubic-bezier(.22,.79,.21,1);
+    box-shadow:-9px 0 25px rgba(34,24,15,.22);
+  }
+  body.mobile-scratch .app>.main>.memo-workspace>.scratch-panel{transform:translate3d(0,0,0)}
+  .app.nav-dragging>.main>.memo-workspace>.scratch-panel{transition:none!important}
+  body:not(.mobile-scratch) .app>.main>.memo-workspace>.scratch-panel{pointer-events:none}
+  body.mobile-scratch .app>.main>.memo-workspace>.scratch-panel{pointer-events:auto}
+  .scratch-panel.scratch-collapsed .scratch-content{display:flex}
+  .scratch-panel .scratch-header{height:60px;min-height:60px;padding:0 10px;gap:7px}
+  .scratch-mobile-menu,.scratch-mobile-back{display:inline-flex;align-items:center;justify-content:center;flex:0 0 40px;width:40px;height:42px;background:transparent;border:0;border-radius:8px;color:var(--text);font-size:27px;cursor:pointer}
+  .scratch-header-title strong{font-size:17px}
+  .scratch-header-title span{font-size:11px}
+  .scratch-fold-btn{display:none}
+  .scratch-content{padding:14px 15px calc(22px + env(safe-area-inset-bottom))}
+  .scratch-text{font-size:16px;line-height:1.8;padding:14px;touch-action:pan-y}
+  .scratch-instruction{font-size:13px}
+  .topbar .scratch-open-btn{font-size:12px;padding:6px 7px}
+  .topbar .save{display:none}
+  .topbar .crumb{max-width:36vw}
+}
+@media(max-width:360px){.topbar .test-top-badge{display:none}}
+@media(max-width:800px) and (prefers-reduced-motion:reduce){.app>.main>.memo-workspace>.scratch-panel{transition-duration:.01ms!important}}
 </style>
 </head>
 <body>
@@ -518,9 +576,11 @@ body[data-theme="dark"] .create-name-modal .create-name-error{color:#ff9499}
   <main class="main">
     <div class="topbar">
       <button type="button" class="mobile-menu-btn" id="mobileMenuBtn" aria-label="カテゴリー一覧を開く" title="カテゴリー一覧">☰</button><span class="mobile-hash">＃</span><span class="crumb" id="crumb">意識</span>
-      <span class="spacer"></span><span class="test-top-badge">テスト</span><span class="save" id="saveState">保存済み</span>
+      <span class="spacer"></span><button type="button" class="scratch-open-btn" id="scratchOpenBtn" aria-label="走り書きを開く" title="走り書きを開く">走り書き <span aria-hidden="true">›</span></button><span class="test-top-badge">テスト</span><span class="save" id="saveState">保存済み</span>
     </div>
-    <div class="editor-wrap">
+    <div class="memo-workspace" id="memoWorkspace">
+      <div class="memo-column" id="memoColumn">
+        <div class="editor-wrap">
       <div class="toolbar-shell" id="toolbarShell">
         <button type="button" id="toolbarToggle" class="toolbar-toggle" aria-controls="editToolbar" aria-expanded="false"><span>✎ 編集ツール</span><span id="toolbarChevron">▾</span></button>
         <div class="toolbar is-folded" id="editToolbar">
@@ -565,7 +625,22 @@ body[data-theme="dark"] .create-name-modal .create-name-error{color:#ff9499}
         <button type="button" id="composerAddImage">画像を追加</button>
         <button type="button" id="composerAddVideo">動画を追加</button>
       </div>
-    </div>
+    </div><!-- /composer-shell -->
+      </div><!-- /memo-column -->
+      <section class="scratch-panel" id="scratchPanel" aria-label="走り書き欄">
+        <div class="scratch-header">
+          <button type="button" class="scratch-mobile-menu" id="scratchCategoryBtn" aria-label="カテゴリー一覧へ移動" title="カテゴリー一覧へ移動">☰</button>
+          <button type="button" class="scratch-mobile-back" id="scratchMobileBack" aria-label="メモ内容に戻る" title="メモ内容に戻る">‹</button>
+          <div class="scratch-header-title"><strong>走り書き</strong><span id="scratchChannelTitle">チャンネルごとのメモ</span></div>
+          <button type="button" class="scratch-fold-btn" id="scratchFoldBtn" aria-expanded="true" aria-label="走り書きを閉じる" title="折りたたむ">›</button>
+        </div>
+        <div class="scratch-content" id="scratchContent">
+          <label class="scratch-instruction" for="scratchText">思いついたことを自由に書き足せます。</label>
+          <textarea id="scratchText" class="scratch-text" spellcheck="false" placeholder="ここに思いついたことを書いてください…" aria-label="走り書き"></textarea>
+          <p class="scratch-hint">各チャンネル専用・自動保存</p>
+        </div>
+      </section>
+    </div><!-- /memo-workspace -->
   </main>
 </div>
 
@@ -621,7 +696,7 @@ body[data-theme="dark"] .create-name-modal .create-name-error{color:#ff9499}
       <button class="theme-option dark" id="themeDark"><span class="preview"><span class="p-side"></span><span class="p-main"></span></span><strong>ダーク</strong><span>これまでの配色</span></button>
     </div>
     <div class="app-update-settings" aria-live="polite">
-      <div class="app-update-heading"><strong>アプリの更新</strong><span id="appBuildLabel">v6.10.0</span></div>
+      <div class="app-update-heading"><strong>アプリの更新</strong><span id="appBuildLabel">v6.11.0</span></div>
       <p id="appUpdateStatus">更新情報を確認しています…</p>
       <div class="app-update-actions">
         <button type="button" id="appCheckUpdate">更新を確認</button>
@@ -1025,8 +1100,22 @@ function enhanceHashtagLinks(){
     }
   });
 }
+function syncScratchView(){
+  const n=currentNote();
+  const field=document.getElementById('scratchText');
+  field.dataset.noteId=n?.id||'';
+  field.value=typeof n?.scratch==='string'?n.scratch:'';
+  field.disabled=!n;
+  document.getElementById('scratchChannelTitle').textContent=n?'# '+(n.title||'無題'):'チャンネルがありません';
+}
+function saveScratchToCurrent(){
+  const n=currentNote(),field=document.getElementById('scratchText');
+  if(!n || !n.id || n.id!==field.dataset.noteId)return;
+  if(n.scratch!==field.value){n.scratch=field.value;save();}
+}
 function loadNote(){
   const n=currentNote();
+  syncScratchView();
   if(!n){
     document.getElementById("noteTitle").value="";
     document.getElementById("crumb").textContent="チャンネルがありません";
@@ -1041,6 +1130,8 @@ function loadNote(){
 }
 function saveCurrent(){
   const n=currentNote();if(!n)return;
+  const scratch=document.getElementById('scratchText');
+  if(n.id && scratch.dataset.noteId===n.id)n.scratch=scratch.value;
   const title=document.getElementById("noteTitle").value;
   n.title=title;
   n.html=plainEditorHtml();
@@ -1578,6 +1669,7 @@ document.getElementById("noteTitle").oninput=()=>{
   const n=currentNote();
   if(!n)return;
   n.title=document.getElementById("noteTitle").value;
+  document.getElementById("scratchChannelTitle").textContent='# '+(n.title||'無題');
   document.getElementById("crumb").textContent=n.title||"無題";
   save();
   const active=document.querySelector(".note.active");
@@ -1778,9 +1870,9 @@ function allLocalNotes(){
 }
 function structureSnapshot(){
  assignIds();
- return {genres:data.genres.map(g=>({id:g.id,name:g.name,icon:g.icon,iconBg:g.iconBg||null,categories:JSON.parse(JSON.stringify(g.categories,(k,v)=>k==='html'||k==='title'?undefined:v))}))};
+ return {genres:data.genres.map(g=>({id:g.id,name:g.name,icon:g.icon,iconBg:g.iconBg||null,categories:JSON.parse(JSON.stringify(g.categories,(k,v)=>k==='html'||k==='title'||k==='scratch'?undefined:v))}))};
 }
-function noteSnapshot(n){return {title:n.title||'',html:n.html||''}}
+function noteSnapshot(n){return {title:n.title||'',html:n.html||'',scratch:typeof n.scratch==='string'?n.scratch:''}}
 function updateSharedBaseline(){
  sharedLastStructure=JSON.stringify(structureSnapshot());
  sharedLastNotes=new Map([...allLocalNotes()].map(([id,n])=>[id,JSON.stringify(noteSnapshot(n))]));
@@ -1799,7 +1891,7 @@ function mergeStructure(remote){
  const activeCategory=data.activeCategoryId,activeNote=data.activeNoteIndex;
  const incoming=structuredClone(remote.genres||[]);
  const walk=nodes=>(nodes||[]).forEach(c=>{
-  c.notes=(c.notes||[]).map(n=>({id:n.id,title:oldNotes.get(n.id)?.title||'',html:oldNotes.get(n.id)?.html||''}));walk(c.children)
+  c.notes=(c.notes||[]).map(n=>({id:n.id,title:oldNotes.get(n.id)?.title||'',html:oldNotes.get(n.id)?.html||'',scratch:oldNotes.get(n.id)?.scratch||''}));walk(c.children)
  });
  incoming.forEach(g=>walk(g.categories));data.genres=incoming;
  const ix=incoming.findIndex(g=>g.id===activeGenreId);data.activeGenre=ix>=0?ix:0;
@@ -1928,7 +2020,7 @@ async function pollShared(){
   if(sharedDirty.has(key)){sharedConflict.add(key);continue}
   Object.assign(n,r.payload);sharedVersions.set(key,r.version);sharedBase.set(key,JSON.stringify(r.payload));changed=true;
  }
- if(changed){updateSharedBaseline();localSaveOnly();if(document.activeElement!==document.getElementById("editor")&&document.activeElement!==document.getElementById("noteTitle")){renderAll();loadNote()}}
+ if(changed){updateSharedBaseline();localSaveOnly();if(document.activeElement!==document.getElementById("editor")&&document.activeElement!==document.getElementById("noteTitle")&&document.activeElement!==document.getElementById("scratchText")){renderAll();loadNote()}}
  if(sharedConflict.size)showSharedStatus('競合あり：別端末でも編集されています');
  else if(!sharedDirty.size)showSharedStatus('共有メモ同期済み');
 }
@@ -1939,7 +2031,7 @@ async function pullCloud(){
 }
 function saveCurrentWithoutCloud(){
  const n=currentNote();if(!n)return;
- n.title=document.getElementById('noteTitle').value;n.html=plainEditorHtml();localSaveOnly();
+ n.title=document.getElementById('noteTitle').value;n.html=plainEditorHtml();const scratch=document.getElementById('scratchText');if(n.id&&scratch.dataset.noteId===n.id)n.scratch=scratch.value;localSaveOnly();
 }
 function normalizeCategoriesAll(){(data.genres||[]).forEach(g=>normalizeCategories(g.categories||[]));if(!data.activeCategoryId){data.activeCategoryId=data.genres[data.activeGenre||0]?.categories?.[0]?.id;data.activeNoteIndex=0}}
 const _localSave=save;
@@ -1981,7 +2073,30 @@ if('serviceWorker' in navigator){
    navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{});
  });
 }
-normalizeCategories(currentGenre().categories);if(!data.activeCategoryId)data.activeCategoryId=currentGenre().categories[0]?.id;data.activeNoteIndex=data.activeNoteIndex??data.active[1]??0;_localSave();setupResize();renderAll();loadNote();
+normalizeCategories(currentGenre().categories);if(!data.activeCategoryId)data.activeCategoryId=currentGenre().categories[0]?.id;data.activeNoteIndex=data.activeNoteIndex??data.active[1]??0;assignIds();_localSave();setupResize();renderAll();loadNote();
+
+
+/* Test v6.11.0: scratchpad entry and desktop collapse state. */
+(function(){
+ const panel=document.getElementById('scratchPanel');
+ const field=document.getElementById('scratchText');
+ const fold=document.getElementById('scratchFoldBtn');
+ const key='memoScratchPanelExpanded_TESTV1';
+ window.setScratchExpanded=function(expanded){
+   panel.classList.toggle('scratch-collapsed',!expanded);
+   document.querySelector('.app>.main').classList.toggle('scratch-expanded',expanded);
+   fold.setAttribute('aria-expanded',String(expanded));
+   fold.setAttribute('aria-label',expanded?'走り書きを折りたたむ':'走り書きを展開する');
+   fold.title=expanded?'折りたたむ':'走り書きを開く';
+   try{localStorage.setItem(key,expanded?'1':'0')}catch(e){}
+ };
+ let expanded=true;try{expanded=localStorage.getItem(key)!=='0'}catch(e){}
+ setScratchExpanded(expanded);
+ fold.addEventListener('click',()=>setScratchExpanded(panel.classList.contains('scratch-collapsed')));
+ field.addEventListener('input',saveScratchToCurrent);
+ field.addEventListener('change',saveScratchToCurrent);
+ field.addEventListener('blur',saveScratchToCurrent);
+})();
 
 /* v6.4 interaction and UI refinements */
 (function(){
@@ -2163,47 +2278,95 @@ normalizeCategories(currentGenre().categories);if(!data.activeCategoryId)data.ac
     }
   },true);
 
-  // Improve mobile swipe sensitivity and slide feel.
+  // Mobile stack: fixed categories behind memo, scratch sliding over memo.
   const app=document.getElementById('app');
   if(app){
-    let gesture=null, blockNextClickUntil=0;
+    let gesture=null, blockNextClickUntil=0, doubleSlideTimer=null;
     const mobile=()=>window.matchMedia('(max-width:800px)').matches;
-    const isList=()=>document.body.classList.contains('mobile-list');
-    function setView(list){ if(!mobile()) return; closeAllMenus(); if(list) document.activeElement?.blur?.(); document.body.classList.toggle('mobile-list',list); }
-    $('#mobileMenuBtn').onclick=()=>setView(true);
-    document.getElementById('categories').addEventListener('click',e=>{ if(mobile() && e.target.closest('.note') && performance.now()>=blockNextClickUntil) setView(false); });
+    const getView=()=>document.body.classList.contains('mobile-list')?'list':(document.body.classList.contains('mobile-scratch')?'scratch':'memo');
+    function cancelDouble(){ if(doubleSlideTimer){clearTimeout(doubleSlideTimer);doubleSlideTimer=null} }
+    function setView(view){
+      if(!mobile())return;
+      cancelDouble();closeAllMenus();
+      const from=getView();
+      if(from==='scratch'&&view!=='scratch'){saveScratchToCurrent();document.activeElement?.blur?.();}
+      if(view!=='memo')document.activeElement?.blur?.();
+      document.body.classList.toggle('mobile-list',view==='list');
+      document.body.classList.toggle('mobile-scratch',view==='scratch');
+      app.classList.remove('nav-dragging');app.style.removeProperty('--nav-offset');
+      document.getElementById('scratchPanel').style.removeProperty('transform');
+    }
+    $('#mobileMenuBtn').onclick=()=>setView('list');
+    $('#scratchOpenBtn').onclick=()=>{
+      if(mobile())setView('scratch');
+      else setScratchExpanded(document.getElementById('scratchPanel').classList.contains('scratch-collapsed'));
+    };
+    $('#scratchMobileBack').onclick=()=>setView('memo');
+    $('#scratchCategoryBtn').onclick=()=>{
+      if(!mobile())return;
+      // Two quick sequential rightward swipes: scratch -> memo -> categories.
+      setView('memo');
+      doubleSlideTimer=setTimeout(()=>{doubleSlideTimer=null;setView('list')},205);
+    };
+    document.getElementById('categories').addEventListener('click',e=>{
+      if(mobile() && e.target.closest('.note') && performance.now()>=blockNextClickUntil)setView('memo');
+    });
     app.addEventListener('touchstart',e=>{
       gesture=null;
-      if(!mobile() || e.touches.length!==1 || e.target.closest('button, input, textarea, select, video, .media-resize')) return;
-      const t=e.touches[0];
-      gesture={x:t.clientX,y:t.clientY,time:performance.now(),list:isList(),mode:null,last:0};
+      if(!mobile() || doubleSlideTimer || e.touches.length!==1 || e.target.closest('button, input, select, video, .media-resize'))return;
+      // Text selection takes priority over swiping inside an actively edited textarea.
+      if(e.target.closest('textarea')&&document.activeElement===e.target)return;
+      const t=e.touches[0];gesture={x:t.clientX,y:t.clientY,time:performance.now(),view:getView(),mode:null,last:0};
     },{passive:true});
     app.addEventListener('touchmove',e=>{
-      if(!gesture || !mobile() || e.touches.length!==1) return;
-      const t=e.touches[0], dx=t.clientX-gesture.x, dy=t.clientY-gesture.y;
-      if(gesture.mode==='vertical') return;
+      if(!gesture||!mobile()||e.touches.length!==1)return;
+      const t=e.touches[0],dx=t.clientX-gesture.x,dy=t.clientY-gesture.y;
+      if(gesture.mode==='vertical')return;
       if(!gesture.mode){
-        if(Math.max(Math.abs(dx),Math.abs(dy))<8) return;
-        if(Math.abs(dy)>Math.abs(dx)*1.15){ gesture.mode='vertical'; return; }
-        if((!gesture.list && dx<=0) || (gesture.list && dx>=0)){ gesture.mode='vertical'; return; }
-        gesture.mode='horizontal'; app.classList.add('nav-dragging');
+        if(Math.max(Math.abs(dx),Math.abs(dy))<9)return;
+        if(Math.abs(dy)>Math.abs(dx)*1.15){gesture.mode='vertical';return}
+        const allowed=(gesture.view==='list'&&dx<0)||(gesture.view==='memo'&&dx!==0)||(gesture.view==='scratch'&&dx>0);
+        if(!allowed){gesture.mode='vertical';return}
+        gesture.mode='horizontal';app.classList.add('nav-dragging');
       }
-      if(gesture.mode!=='horizontal') return;
-      if(e.cancelable) e.preventDefault();
-      const w=app.clientWidth; const offset=Math.max(0,Math.min(w,(gesture.list?w:0)+dx)); gesture.last=dx; app.style.setProperty('--nav-offset',offset+'px');
+      if(gesture.mode!=='horizontal')return;
+      if(e.cancelable)e.preventDefault();
+      const w=app.clientWidth;
+      if(gesture.view==='scratch'){
+        document.getElementById('scratchPanel').style.transform='translate3d('+Math.max(0,Math.min(w,dx))+'px,0,0)';
+      }else if(gesture.view==='memo'&&dx<0){
+        // Reveal the scratchpad as it is dragged over the memo.
+        document.getElementById('scratchPanel').style.transform='translate3d('+Math.max(0,Math.min(w,w+dx))+'px,0,0)';
+      }else{
+        const offset=Math.max(0,Math.min(w,(gesture.view==='list'?w:0)+dx));
+        app.style.setProperty('--nav-offset',offset+'px');
+      }
+      gesture.last=dx;
     },{passive:false});
     function finishGesture(e,canceled){
-      if(!gesture) return; const g=gesture; gesture=null; if(g.mode!=='horizontal') return;
-      const t=e.changedTouches?.[0]; const dx=t?t.clientX-g.x:g.last; const dt=Math.max(1,performance.now()-g.time);
-      const threshold=Math.min(72,Math.max(28,app.clientWidth*0.11));
-      const valid=!canceled && (Math.abs(dx)>threshold || (Math.abs(dx)>18 && Math.abs(dx)/dt>0.28));
-      blockNextClickUntil=performance.now()+360; if(valid) setView(!g.list); app.classList.remove('nav-dragging'); app.style.removeProperty('--nav-offset');
+      if(!gesture)return;const g=gesture;gesture=null;if(g.mode!=='horizontal')return;
+      const t=e.changedTouches?.[0],dx=t?t.clientX-g.x:g.last,dt=Math.max(1,performance.now()-g.time);
+      const threshold=Math.min(75,Math.max(30,app.clientWidth*.11));
+      const valid=!canceled&&(Math.abs(dx)>threshold||(Math.abs(dx)>18&&Math.abs(dx)/dt>.28));
+      blockNextClickUntil=performance.now()+360;
+      if(valid){
+        if(g.view==='scratch')setView('memo');
+        else if(g.view==='list')setView('memo');
+        else setView(dx<0?'scratch':'list');
+      }
+      app.classList.remove('nav-dragging');app.style.removeProperty('--nav-offset');
+      document.getElementById('scratchPanel').style.removeProperty('transform');
     }
     app.addEventListener('touchend',e=>finishGesture(e,false),{passive:true});
     app.addEventListener('touchcancel',e=>finishGesture(e,true),{passive:true});
-    app.addEventListener('click',e=>{ if(mobile() && performance.now()<blockNextClickUntil && e.target.closest('.note')){ e.preventDefault(); e.stopImmediatePropagation(); } }, true);
-    window.addEventListener('resize',()=>{ if(!mobile()){ document.body.classList.remove('mobile-list'); app.classList.remove('nav-dragging'); app.style.removeProperty('--nav-offset'); gesture=null; } });
+    app.addEventListener('click',e=>{
+      if(mobile()&&performance.now()<blockNextClickUntil&&e.target.closest('.note')){e.preventDefault();e.stopImmediatePropagation()}
+    },true);
+    window.addEventListener('resize',()=>{
+      if(!mobile()){cancelDouble();document.body.classList.remove('mobile-list','mobile-scratch');app.classList.remove('nav-dragging');app.style.removeProperty('--nav-offset');document.getElementById('scratchPanel').style.removeProperty('transform');gesture=null}
+    });
   }
+
 })();
 
 /* v6.5: retain folding behavior on both desktop and mobile. */
@@ -2226,7 +2389,7 @@ normalizeCategories(currentGenre().categories);if(!data.activeCategoryId)data.ac
 /* v6.5: PWA update detection + user-initiated safe refresh. */
 (function(){
  'use strict';
- const INSTALLED_BUILD='6.10.0';
+ const INSTALLED_BUILD='6.11.0';
  const intervalMs=10*60*1000;
  const status=document.getElementById('appUpdateStatus');
  const buildLabel=document.getElementById('appBuildLabel');
@@ -2365,7 +2528,7 @@ normalizeCategories(currentGenre().categories);if(!data.activeCategoryId)data.ac
 
   const toolbar=document.getElementById('toolbarShell');
   const memoScroll=document.querySelector('.main .editor-wrap');
-  const main=document.querySelector('.app>.main');
+  const main=document.getElementById('memoColumn');
   const media=window.matchMedia('(max-width:800px)');
   const visual=window.visualViewport;
   let frame=0;
@@ -2399,7 +2562,7 @@ normalizeCategories(currentGenre().categories);if(!data.activeCategoryId)data.ac
   visual?.addEventListener('resize',scheduleLayout);
   visual?.addEventListener('scroll',scheduleLayout);
   document.addEventListener('focusin',e=>{
-    if(media.matches && e.target.closest('#editor,#noteTitle,#fontSize'))scheduleLayout();
+    if(media.matches && e.target.closest('#editor,#noteTitle,#fontSize,#scratchText'))scheduleLayout();
   });
   updateMobileLayout();
 })();
