@@ -455,6 +455,23 @@ body[data-theme="dark"] .create-name-modal .create-name-error{color:#ff9499}
  .create-name-modal{max-height:calc(var(--memo-mobile-viewport,100dvh) - 24px);overflow-y:auto}
 }
 
+/* TEST v6.10.0: consistent safe, app-owned dialogs */
+.safe-info-modal h2,.channel-delete-modal h2{margin:0 0 9px}
+.safe-info-modal p{margin:10px 0 0;white-space:pre-line;overflow-wrap:anywhere}
+.safe-confirm-details{white-space:pre-line;overflow-wrap:anywhere;line-height:1.65}
+.channel-delete-modal{width:min(480px,calc(100vw - 28px));max-height:min(88dvh,700px);overflow:auto}
+.channel-delete-list{margin:11px 0 12px;padding:5px;border:1px solid var(--line);border-radius:9px;max-height:min(38dvh,310px);overflow-y:auto}
+.channel-delete-list .channel-delete-row{margin:0;display:flex;gap:11px;color:var(--text);font-size:14px;min-height:40px;align-items:center}
+.channel-delete-list .channel-delete-row input{margin:0;flex:0 0 auto;width:18px;height:18px;accent-color:var(--accent)}
+.channel-delete-list .channel-delete-row span{min-width:0;overflow-wrap:anywhere}
+.channel-delete-controls{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.channel-delete-controls .channel-delete-row{padding:6px 10px}
+.channel-delete-count{font-size:12px;color:var(--muted)}
+.modal-actions button:disabled{opacity:.48;cursor:not-allowed}
+.channel-delete-modal .channel-delete-warning{font-size:12px;color:var(--danger);margin:8px 0 0}
+.channel-delete-modal .modal-actions{margin-top:15px}
+.safe-dialog-input{font-size:16px}
+@media(max-width:800px){.channel-delete-modal{max-height:calc(var(--memo-mobile-viewport,100dvh) - 24px)}}
 </style>
 </head>
 <body>
@@ -604,7 +621,7 @@ body[data-theme="dark"] .create-name-modal .create-name-error{color:#ff9499}
       <button class="theme-option dark" id="themeDark"><span class="preview"><span class="p-side"></span><span class="p-main"></span></span><strong>ダーク</strong><span>これまでの配色</span></button>
     </div>
     <div class="app-update-settings" aria-live="polite">
-      <div class="app-update-heading"><strong>アプリの更新</strong><span id="appBuildLabel">v6.9.0</span></div>
+      <div class="app-update-heading"><strong>アプリの更新</strong><span id="appBuildLabel">v6.10.0</span></div>
       <p id="appUpdateStatus">更新情報を確認しています…</p>
       <div class="app-update-actions">
         <button type="button" id="appCheckUpdate">更新を確認</button>
@@ -615,10 +632,26 @@ body[data-theme="dark"] .create-name-modal .create-name-error{color:#ff9499}
   </div>
 </div>
 <div class="modal-back" id="confirmBack">
-  <div class="modal">
+  <div class="modal" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle" aria-describedby="confirmMessage">
     <h2 id="confirmTitle">削除の確認</h2>
-    <p class="confirm-text" id="confirmMessage"></p>
-    <div class="modal-actions"><button id="confirmCancel">キャンセル</button><button class="danger-fill" id="confirmOk">削除</button></div>
+    <p class="confirm-text safe-confirm-details" id="confirmMessage"></p>
+    <div class="modal-actions"><button type="button" id="confirmCancel">キャンセル</button><button type="button" class="danger-fill" id="confirmOk">削除する</button></div>
+  </div>
+</div>
+<div class="modal-back" id="safeInfoBack">
+  <div class="modal safe-info-modal" role="alertdialog" aria-modal="true" aria-labelledby="safeInfoTitle" aria-describedby="safeInfoMessage">
+    <h2 id="safeInfoTitle">お知らせ</h2>
+    <p id="safeInfoMessage"></p>
+    <div class="modal-actions"><button type="button" class="primary" id="safeInfoOk">OK</button></div>
+  </div>
+</div>
+<div class="modal-back" id="channelRenameBack">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="channelRenameTitle">
+    <h2 id="channelRenameTitle">チャンネル名を編集</h2>
+    <label for="channelRenameInput">チャンネル名</label>
+    <input type="text" class="safe-dialog-input" id="channelRenameInput" maxlength="100" autocomplete="off">
+    <p id="channelRenameError" class="create-name-error" role="status" aria-live="polite"></p>
+    <div class="modal-actions"><button type="button" id="channelRenameCancel">キャンセル</button><button type="button" class="primary" id="channelRenameSave">保存</button></div>
   </div>
 </div>
 
@@ -814,6 +847,34 @@ function findCategory(id,nodes=currentGenre().categories){
 function findCategoryInfo(id,nodes=currentGenre().categories,parent=null){
   for(let i=0;i<nodes.length;i++){if(nodes[i].id===id)return {node:nodes[i],arr:nodes,index:i,parent};const r=findCategoryInfo(id,nodes[i].children,nodes[i]);if(r)return r} return null;
 }
+// Build a stable category parent map. Channel edits must never change these links.
+function categoryParentMap(nodes=currentGenre().categories){
+  const parents=new Map();
+  function walk(items,parentId){
+    for(const item of (items||[])){
+      if(!item?.id || parents.has(item.id))throw new Error('カテゴリーIDの重複または不正な階層です');
+      parents.set(item.id,parentId);
+      walk(item.children,item.id);
+    }
+  }
+  walk(nodes,null);
+  return parents;
+}
+function sameCategoryParents(before,after){
+  return before.size===after.size && [...before].every(([id,parent])=>after.has(id)&&after.get(id)===parent);
+}
+// Deleting a category promotes only its immediate children. Grandchildren must
+// keep their original parent, and no unrelated category may be moved.
+function categoryDeleteRelationsValid(before,after,deletedId,deletedParent){
+  if(after.has(deletedId)||after.size!==before.size-1)return false;
+  for(const [id,parent] of before){
+    if(id===deletedId)continue;
+    const expected=parent===deletedId?deletedParent:parent;
+    if(!after.has(id)||after.get(id)!==expected)return false;
+  }
+  return true;
+}
+
 function ensureCategoryState(){
   currentGenre().categories.forEach(c=>{}); 
 normalizeCategories(currentGenre().categories);
@@ -966,7 +1027,12 @@ function enhanceHashtagLinks(){
 }
 function loadNote(){
   const n=currentNote();
-  if(!n)return;
+  if(!n){
+    document.getElementById("noteTitle").value="";
+    document.getElementById("crumb").textContent="チャンネルがありません";
+    document.getElementById("editor").innerHTML="";
+    return;
+  }
   document.getElementById("noteTitle").value=n.title;
   document.getElementById("crumb").textContent=n.title;
   document.getElementById("editor").innerHTML=n.html;
@@ -996,12 +1062,10 @@ function createGenre(){
   data.activeGenre=data.genres.length-1;data.activeCategoryId=c.id;data.activeNoteIndex=0;data.active=[0,0];save();closeModal();renderAll();loadNote();
 }
 function renameCategory(ci){
-  const v=prompt("カテゴリ名",currentGenre().categories[ci].name);
-  if(v&&v.trim()){currentGenre().categories[ci].name=v.trim();save();renderCategories()}
+  const c=currentGenre().categories[ci];if(c)renameCategory2(c.id);
 }
 function renameNote(ci,ni){
-  const v=prompt("メモ名",currentGenre().categories[ci].notes[ni].title);
-  if(v&&v.trim()){currentGenre().categories[ci].notes[ni].title=v.trim();save();renderCategories();loadNote()}
+  const c=currentGenre().categories[ci];if(c)renameNote2(c.id,ni);
 }
 function openContext(x,y,i){
   data._contextGenre=i;
@@ -1190,22 +1254,25 @@ document.getElementById('createNameInput').addEventListener('keydown',e=>{
   else if(e.key==='Escape'){e.preventDefault();closeCreateNameModal();}
 });
 const CATEGORY_UNDO_KEY=KEY+"_categoryUndo";
-function pushCategoryUndo(){
+function pushCategoryUndoSnapshot(categoriesBefore=null){
   try{
     const stack=JSON.parse(localStorage.getItem(CATEGORY_UNDO_KEY)||"[]");
-    stack.push(JSON.parse(JSON.stringify(data)));
+    const state=JSON.parse(JSON.stringify(data));
+    if(categoriesBefore)state.genres[state.activeGenre].categories=categoriesBefore;
+    stack.push(state);
     if(stack.length>30)stack.shift();
     localStorage.setItem(CATEGORY_UNDO_KEY,JSON.stringify(stack));
   }catch(e){}
 }
+function pushCategoryUndo(){pushCategoryUndoSnapshot();}
 function undoCategoryOperation(){
   try{
     const stack=JSON.parse(localStorage.getItem(CATEGORY_UNDO_KEY)||"[]");
-    if(!stack.length){alert("戻せる操作がありません。");return}
+    if(!stack.length){openInfoModal("戻せる操作がありません。","操作を戻す");return}
     data=stack.pop();
     localStorage.setItem(CATEGORY_UNDO_KEY,JSON.stringify(stack));
     save();closeAllMenus();renderAll();loadNote();
-  }catch(e){alert("操作を戻せませんでした。")}
+  }catch(e){openInfoModal("操作を戻せませんでした。","操作を戻す")}
 }
 function renameCategory2(id){
   const c=findCategory(id);if(!c)return;
@@ -1226,7 +1293,7 @@ function renameCategory2(id){
   back.onclick=e=>{if(e.target===back)cleanup()};
   saveBtn.onclick=()=>{
     const next=name.value.trim();
-    if(!next){alert("カテゴリー名を入力してください。");return}
+    if(!next){openInfoModal("カテゴリー名を入力してください。","入力が必要です");return}
     pushCategoryUndo();
     c.name=next;
     c.fontSize=Number(range.value);
@@ -1236,104 +1303,203 @@ function renameCategory2(id){
 }
 
 function addNoteToCategory(id){openCreateNameModal('channel','root',id);}
-function openConfirmModal(message,onOk){
-  const back=document.getElementById("confirmBack");
-  const msg=document.getElementById("confirmMessage");
-  const ok=document.getElementById("confirmOk");
-  const cancel=document.getElementById("confirmCancel");
+// All app notifications use a single styled dialog. No browser alert().
+function openInfoModal(message,title='お知らせ'){
+  closeAllMenus();
+  const back=document.getElementById('safeInfoBack');
+  document.getElementById('safeInfoTitle').textContent=title;
+  document.getElementById('safeInfoMessage').textContent=message;
+  const ok=document.getElementById('safeInfoOk');
+  back.classList.add('show');
+  const close=()=>{back.classList.remove('show');back.onclick=null;ok.onclick=null};
+  ok.onclick=close;
+  back.onclick=e=>{if(e.target===back)close()};
+  requestAnimationFrame(()=>ok.focus());
+}
+function openConfirmModal(message,onOk,options={}){
+  const back=document.getElementById('confirmBack');
+  const msg=document.getElementById('confirmMessage');
+  const ok=document.getElementById('confirmOk');
+  const cancel=document.getElementById('confirmCancel');
+  document.getElementById('confirmTitle').textContent=options.title||'削除の確認';
   msg.textContent=message;
-  back.classList.add("show");
-  const cleanup=()=>{back.classList.remove("show");ok.onclick=null;cancel.onclick=null;back.onclick=null};
-  cancel.onclick=cleanup;
-  back.onclick=e=>{if(e.target===back)cleanup()};
+  ok.textContent=options.confirmLabel||'削除する';
+  ok.classList.toggle('danger-fill',options.danger!==false);
+  if(options.danger===false)ok.classList.add('primary');else ok.classList.remove('primary');
+  back.classList.add('show');
+  const cleanup=()=>{back.classList.remove('show');ok.onclick=null;cancel.onclick=null;back.onclick=null};
+  cancel.onclick=()=>{cleanup();options.onCancel?.()};
+  back.onclick=e=>{if(e.target===back){cleanup();options.onCancel?.()}};
   ok.onclick=()=>{cleanup();onOk()};
+  requestAnimationFrame(()=>cancel.focus());
+}
+function confirmAction(message,options={}){
+  return new Promise(resolve=>openConfirmModal(message,()=>resolve(true),{...options,onCancel:()=>resolve(false)}));
 }
 
 function deleteCategory(id){
-  const categoryNotesBefore=snapshotCategoryNotes();
   const info=findCategoryInfo(id);if(!info)return;
-  if(currentGenre().categories.length<=1&&info.arr===currentGenre().categories){
-    alert("最後のカテゴリーは削除できません。");return;
+  if(currentGenre().categories.length<=1 && info.arr===currentGenre().categories){
+    openInfoModal('最後のカテゴリーは削除できません。','削除できません');return;
   }
-  openConfirmModal(`「${info.node.name}」を本当に削除しますか？`,()=>{
-  pushCategoryUndo();
-  const wasActive=data.activeCategoryId===info.node.id;
-  const promoted=info.node.children||[];
-  // Delete only this category. Its child categories are promoted to the
-  // same level, so deleting "aa" does not delete "キャラ対".
-  info.arr.splice(info.index,1,...promoted);
-
-  if(wasActive){
-    const fallback=info.arr[info.index]||info.arr[info.index-1]||currentGenre().categories[0];
-    data.activeCategoryId=fallback?.id||null;
-    data.activeNoteIndex=0;
-  }
-  restoreCategoryNotes(categoryNotesBefore);
-  save();closeAllMenus();renderCategories();loadNote();
+  const categoryId=info.node.id;
+  const categoryName=info.node.name;
+  const channelCount=info.node.notes?.length||0;
+  const childrenCount=info.node.children?.length||0;
+  const effect=`「${categoryName}」を削除します。\n\nこのカテゴリー内のチャンネル：${channelCount}件（削除対象）\n下位カテゴリー：${childrenCount}件（削除せず上の階層へ移動）\n\nこの操作はメモの構成に影響します。よろしいですか？`;
+  closeAllMenus();
+  openConfirmModal(effect,()=>{
+    // Find the current node again: the tree may have changed while a dialog was open.
+    const fresh=findCategoryInfo(categoryId);if(!fresh){openInfoModal('削除対象のカテゴリーが見つかりません。','削除を中止しました');return}
+    const backup=structuredClone(currentGenre().categories);
+    const notesBefore=snapshotCategoryNotes();
+    let previous;
+    try{previous=categoryParentMap()}catch(e){openInfoModal(e.message,'削除を中止しました');return}
+    const deletedParent=fresh.parent?.id||null;
+    const wasActive=data.activeCategoryId===fresh.node.id;
+    const promoted=fresh.node.children||[];
+    // Do not change anything if the current category differs from what was confirmed.
+    if(fresh.node.name!==categoryName || (fresh.node.notes?.length||0)!==channelCount || promoted.length!==childrenCount){
+      openInfoModal('確認画面を開いた後にカテゴリーの内容が変わりました。もう一度操作してください。','削除を中止しました');return;
+    }
+    fresh.arr.splice(fresh.index,1,...promoted);
+    let valid=false;
+    try{valid=categoryDeleteRelationsValid(previous,categoryParentMap(),categoryId,deletedParent)}catch(e){}
+    if(!valid){
+      currentGenre().categories=backup;
+      openInfoModal('カテゴリー階層の整合性を確認できなかったため、削除しませんでした。','削除を中止しました');return;
+    }
+    pushCategoryUndoSnapshot(backup);
+    if(wasActive){
+      const fallback=fresh.arr[fresh.index]||fresh.arr[fresh.index-1]||currentGenre().categories[0];
+      data.activeCategoryId=fallback?.id||null;data.activeNoteIndex=0;
+    }
+    restoreCategoryNotes(notesBefore);
+    save();closeAllMenus();renderCategories();loadNote();
   });
 }
+function deleteChannelsSafely(categoryId,noteIds){
+  // Re-resolve by IDs at confirmation time, not the original menu's indices.
+  const c=findCategory(categoryId);
+  if(!c){openInfoModal('カテゴリーが見つからないため削除を中止しました。','削除を中止しました');return false}
+  assignIds();
+  const ids=new Set(noteIds);
+  if(ids.size!==noteIds.length || ![...ids].every(id=>c.notes.some(n=>n.id===id))){
+    openInfoModal('確認中にチャンネルが変更されました。もう一度選択してください。','削除を中止しました');return false;
+  }
+  const parents=categoryParentMap();
+  const snapshot=structuredClone(currentGenre().categories);
+  const priorNotes=c.notes;
+  const activeNoteId=(data.activeCategoryId===categoryId)?priorNotes[data.activeNoteIndex]?.id:null;
+  const remaining=priorNotes.filter(n=>!ids.has(n.id));
+  // Save undo BEFORE modifying the channel list.
+  pushCategoryUndo();
+  c.notes=remaining;
+  if(!sameCategoryParents(parents,categoryParentMap())){
+    currentGenre().categories=snapshot;
+    openInfoModal('カテゴリーの親子関係に変更が見つかったため、削除を中止しました。','削除を中止しました');return false;
+  }
+  if(data.activeCategoryId===categoryId){
+    const retained=remaining.findIndex(n=>n.id===activeNoteId);
+    data.activeNoteIndex=retained>=0?retained:Math.min(data.activeNoteIndex,Math.max(remaining.length-1,0));
+  }
+  save();closeAllMenus();renderCategories();loadNote();
+  return true;
+}
 function deleteChannelFromCategory(){
-  const c=findCategory(menuCatIndex);
-  if(!c||!c.notes||!c.notes.length){
-    alert("削除できるチャンネルがありません。");
+  const categoryId=menuCatIndex;
+  const c=findCategory(categoryId);
+  closeAllMenus();
+  if(!c||!c.notes?.length){
+    openInfoModal('このカテゴリーには削除できるチャンネルがありません。','チャンネルがありません');
     return;
   }
-
-  const list=c.notes.map((n,i)=>`
-    <label class="channel-delete-row">
-      <input type="radio" name="channelDeleteChoice" value="${i}">
-      <span>${esc(n.title||"無題")}</span>
-    </label>`).join("");
-
-  // Close the category menu *before* showing the deletion dialog.
-  // Previously its z-index placed it above the modal and blocked radio buttons.
-  closeAllMenus();
-  const modal=document.createElement("div");
-  modal.className="modal-back show";
-  modal.innerHTML=`
-    <div class="modal channel-delete-modal">
-      <h3>チャンネルを削除</h3>
-      <p>削除するチャンネルを1つ選択してください。</p>
-      <div class="channel-delete-list">${list}</div>
-      <div class="modal-actions">
-        <button id="channelDeleteCancel">キャンセル</button>
-        <button class="danger" id="channelDeleteConfirm">削除</button>
-      </div>
-    </div>`;
+  // IDs are stable across list reordering and remote updates, unlike indices.
+  assignIds();
+  const categoryName=c.name;
+  const entries=c.notes.map(n=>({id:n.id,title:n.title||'無題'}));
+  const list=entries.map((n,i)=>`<label class="channel-delete-row"><input type="checkbox" class="channel-delete-choice" value="${i}"><span># ${esc(n.title)}</span></label>`).join('');
+  const modal=document.createElement('div');
+  modal.className='modal-back show';
+  modal.innerHTML=`<div class="modal channel-delete-modal" role="dialog" aria-modal="true" aria-labelledby="multiDeleteTitle">
+    <h2 id="multiDeleteTitle">チャンネルを削除</h2>
+    <p>「${esc(categoryName)}」から削除するチャンネルを選択してください。</p>
+    <div class="channel-delete-controls">
+      <label class="channel-delete-row"><input type="checkbox" id="channelDeleteAll"><span>すべて選択</span></label>
+      <span class="channel-delete-count" id="channelDeleteCount" aria-live="polite">0件選択中</span>
+    </div>
+    <div class="channel-delete-list">${list}</div>
+    <p class="channel-delete-warning">※ 削除すると選択したチャンネルの本文も削除対象になります。</p>
+    <div class="modal-actions"><button type="button" id="channelDeleteCancel">キャンセル</button><button type="button" class="danger-fill" id="channelDeleteNext" disabled>削除内容を確認</button></div>
+  </div>`;
   document.body.appendChild(modal);
-
-  const close=()=>modal.remove();
-  document.getElementById("channelDeleteCancel").onclick=close;
-  modal.addEventListener("click",e=>{if(e.target===modal)close()});
-
-  document.getElementById("channelDeleteConfirm").onclick=()=>{
-    const selected=modal.querySelector('input[name="channelDeleteChoice"]:checked');
-    if(!selected){
-      alert("削除するチャンネルを選択してください。");
-      return;
-    }
-    const i=Number(selected.value);
-    const target=c.notes[i];
-    close();
-    openConfirmModal(`「${target.title||"無題"}」を本当に削除しますか？`,()=>{
-      if(typeof pushCategoryUndo==="function")pushCategoryUndo();
-      c.notes.splice(i,1);
-
-      if(data.activeCategoryId===c.id){
-        if(c.notes.length===0)data.activeNoteIndex=0;
-        else if(data.activeNoteIndex>=c.notes.length)data.activeNoteIndex=c.notes.length-1;
-      }
-
-      save();
-      closeAllMenus();
-      renderCategories();
-      loadNote();
-    });
+  const selected=()=>[...modal.querySelectorAll('.channel-delete-choice:checked')].map(input=>Number(input.value));
+  const all=modal.querySelector('#channelDeleteAll');
+  const count=modal.querySelector('#channelDeleteCount');
+  const next=modal.querySelector('#channelDeleteNext');
+  const refresh=()=>{
+    const n=selected().length;
+    count.textContent=`${n}件選択中`;
+    next.disabled=n===0;
+    all.checked=n===entries.length;
+    all.indeterminate=n>0&&n<entries.length;
   };
+  all.addEventListener('change',()=>{modal.querySelectorAll('.channel-delete-choice').forEach(input=>{input.checked=all.checked});refresh()});
+  modal.querySelectorAll('.channel-delete-choice').forEach(input=>input.addEventListener('change',refresh));
+  const close=()=>modal.remove();
+  modal.querySelector('#channelDeleteCancel').onclick=close;
+  modal.addEventListener('click',e=>{if(e.target===modal)close()});
+  next.onclick=()=>{
+    const indices=selected();if(!indices.length)return;
+    const chosen=indices.map(i=>entries[i]);
+    const names=chosen.map(n=>'・# '+n.title).join('\n');
+    close();
+    openConfirmModal(`次の${chosen.length}件のチャンネルを削除します。\n\n${names}\n\n※ 選択したチャンネルの文章も削除されます。削除対象と件数を確認してください。`,()=>{
+      const current=findCategory(categoryId);
+      if(!current || current.name!==categoryName){openInfoModal('カテゴリーが変更されたため、削除を中止しました。','削除を中止しました');return}
+      // Flush the editor before removing notes to avoid overwriting a different one.
+      saveCurrent();
+      deleteChannelsSafely(categoryId,chosen.map(n=>n.id));
+    },{title:`${chosen.length}件の削除を確認`,confirmLabel:`${chosen.length}件を削除する`});
+  };
+  refresh();
 }
-
-function renameNote2(id,ni){const c=findCategory(id);if(!c)return;const v=prompt("チャンネル名",c.notes[ni].title);if(v&&v.trim()){c.notes[ni].title=v.trim();save();renderCategories();loadNote()}}
-function deleteNote(id,ni){const c=findCategory(id);if(!c||c.notes.length<=1){alert("最後のチャンネルは削除できません。");return}openConfirmModal(`「${c.notes[ni].title}」を本当に削除しますか？`,()=>{c.notes.splice(ni,1);data.activeCategoryId=id;data.activeNoteIndex=Math.max(0,Math.min(ni,c.notes.length-1));save();closeAllMenus();renderCategories();loadNote()})}
+// Every rename has an app-owned input dialog instead of browser prompt().
+let pendingChannelRename=null;
+function renameNote2(id,ni){
+  const c=findCategory(id),n=c?.notes[ni];if(!n)return;
+  assignIds();
+  pendingChannelRename={categoryId:id,noteId:n.id};
+  const back=document.getElementById('channelRenameBack'),input=document.getElementById('channelRenameInput');
+  input.value=n.title||'';
+  document.getElementById('channelRenameError').textContent='';
+  back.classList.add('show');requestAnimationFrame(()=>{input.focus();input.select()});
+}
+function closeChannelRename(){document.getElementById('channelRenameBack').classList.remove('show');pendingChannelRename=null}
+function saveChannelRename(){
+  if(!pendingChannelRename)return;
+  const value=document.getElementById('channelRenameInput').value.trim();
+  if(!value){document.getElementById('channelRenameError').textContent='チャンネル名を入力してください。';return}
+  const c=findCategory(pendingChannelRename.categoryId);
+  const n=c?.notes.find(x=>x.id===pendingChannelRename.noteId);
+  if(!n){closeChannelRename();openInfoModal('チャンネルが見つかりません。','変更を中止しました');return}
+  saveCurrent();n.title=value;save();closeChannelRename();renderCategories();loadNote();
+}
+document.getElementById('channelRenameCancel').onclick=closeChannelRename;
+document.getElementById('channelRenameSave').onclick=saveChannelRename;
+document.getElementById('channelRenameBack').onclick=e=>{if(e.target.id==='channelRenameBack')closeChannelRename()};
+document.getElementById('channelRenameInput').addEventListener('keydown',e=>{if(e.key==='Enter')saveChannelRename();if(e.key==='Escape')closeChannelRename()});
+function deleteNote(id,ni){
+  const c=findCategory(id),note=c?.notes[ni];
+  if(!note)return;
+  if(c.notes.length<=1){openInfoModal('最後のチャンネルは、このメニューから削除できません。','削除できません');return}
+  assignIds();
+  const noteId=note.id;
+  closeAllMenus();
+  openConfirmModal(`「# ${note.title||'無題'}」を削除します。\n\n※ このチャンネルのメモ本文も削除されます。よろしいですか？`,()=>{
+    saveCurrent();deleteChannelsSafely(id,[noteId]);
+  },{confirmLabel:'チャンネルを削除する'});
+}
 
 document.getElementById("catRenameBtn").onclick=()=>{renameCategory2(menuCatIndex);closeCategoryMenu()};
 document.getElementById("catHierarchyBtn").onclick=e=>{
@@ -1485,8 +1651,8 @@ document.getElementById("genreRenameSave").onclick=saveGenreRename;
 document.getElementById("genreRenameName").addEventListener("keydown",e=>{if(e.key==="Enter")saveGenreRename();if(e.key==="Escape")closeGenreRenameModal()});
 document.getElementById("genreRenameBack").addEventListener("click",e=>{if(e.target.id==="genreRenameBack")closeGenreRenameModal()});
 document.getElementById("deleteGenre").onclick=()=>{
-  const i=data._contextGenre;if(data.genres.length<=1){alert("最後のジャンルは削除できません。");closeContext();return}
-  openConfirmModal(`「${data.genres[i].name}」を本当に削除しますか？`,()=>{data.genres.splice(i,1);data.activeGenre=Math.max(0,Math.min(data.activeGenre,data.genres.length-1));data.active=[0,0];save();renderAll();loadNote()});closeContext()
+  const i=data._contextGenre;if(data.genres.length<=1){openInfoModal("最後のメモは削除できません。","削除できません");closeContext();return}
+  openConfirmModal(`「${data.genres[i].name}」を削除します。\n\n※ このメモに含まれるすべてのカテゴリー・チャンネル・本文も削除対象です。よろしいですか？`,()=>{data.genres.splice(i,1);data.activeGenre=Math.max(0,Math.min(data.activeGenre,data.genres.length-1));data.active=[0,0];save();renderAll();loadNote()});closeContext()
 };
 document.addEventListener("click",e=>{
   if(!e.target.closest("#contextMenu")&&!e.target.closest("#genreSettingsMenu")&&!e.target.closest("#genreMenuBtn")){closeContext();closeGenreSettings()}
@@ -1684,7 +1850,7 @@ async function initializeShared(){
  const existing=await fetchSharedRows().catch(e=>{showSharedStatus('テスト版接続エラー：'+e.message);return null});
  if(!existing)return;
  if(existing.size!==0){showSharedStatus('テスト版にはすでにデータがあります。上書きしないためコピーを中止しました。');return}
- if(!confirm('安定版のメモをテスト用にコピーしますか？\n\n安定版のデータは変更しません。テスト版で編集しても本番には反映されません。'))return;
+ if(!await confirmAction('安定版のメモをテスト用にコピーしますか？\n\n安定版のデータは変更しません。テスト版で編集しても本番には反映されません。',{title:'テスト版へのコピー確認',confirmLabel:'テスト版へコピー',danger:false}))return;
  const button=document.getElementById('testCopyFromStable');
  button.disabled=true;
  showSharedStatus('安定版からテストへコピーしています…');
@@ -1837,7 +2003,7 @@ normalizeCategories(currentGenre().categories);if(!data.activeCategoryId)data.ac
   openCategoryMenu=function(x,y,ci){ menuCatIndex=ci; closeAllMenus(); positionMenu($('#catMenu'),x,y); };
   openNoteMenu=function(x,y,ci,ni){ menuNote={ci,ni}; closeAllMenus(); positionMenu($('#noteMenu'),x,y); };
   const _openConfirmModal=openConfirmModal;
-  openConfirmModal=function(message,onOk){ closeAllMenus(); _openConfirmModal(message,onOk); };
+  openConfirmModal=function(message,onOk,options={}){ closeAllMenus(); _openConfirmModal(message,onOk,options); };
 
   // Left-click active icon to open its menu on desktop.
   $('#genres').addEventListener('click',e=>{
@@ -2060,7 +2226,7 @@ normalizeCategories(currentGenre().categories);if(!data.activeCategoryId)data.ac
 /* v6.5: PWA update detection + user-initiated safe refresh. */
 (function(){
  'use strict';
- const INSTALLED_BUILD='6.9.0';
+ const INSTALLED_BUILD='6.10.0';
  const intervalMs=10*60*1000;
  const status=document.getElementById('appUpdateStatus');
  const buildLabel=document.getElementById('appBuildLabel');
