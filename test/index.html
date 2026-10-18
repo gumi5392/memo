@@ -473,7 +473,7 @@ body[data-theme="dark"] .create-name-modal .create-name-error{color:#ff9499}
 .safe-dialog-input{font-size:16px}
 @media(max-width:800px){.channel-delete-modal{max-height:calc(var(--memo-mobile-viewport,100dvh) - 24px)}}
 
-/* TEST v6.11.0 — Per-channel scratchpad, separate from the formatted memo. */
+/* TEST v6.11.1 — Per-channel scratchpad, separate from the formatted memo. */
 .memo-workspace{display:flex;flex:1 1 auto;min-width:0;min-height:0;overflow:hidden}
 .memo-column{display:flex;flex:1 1 auto;flex-direction:column;min-width:0;min-height:0;overflow:hidden}
 .memo-column>.editor-wrap{flex:1 1 auto;min-height:0;min-width:0;overflow-y:auto}
@@ -498,9 +498,6 @@ body[data-theme="dark"] .create-name-modal .create-name-error{color:#ff9499}
 .scratch-text::placeholder{color:var(--muted);opacity:.8}
 .scratch-hint{margin:0}
 .scratch-mobile-menu,.scratch-mobile-back{display:none}
-@media(min-width:801px){
-  .main.scratch-expanded .toolbar-shell{right:calc(var(--scratch-width,310px) + 16px);max-width:calc(100vw - 710px)}
-}
 @media(max-width:800px){
   .app>.main>.memo-workspace{display:flex;flex:1 1 auto;min-height:0;overflow:visible}
   .app>.main>.memo-workspace>.memo-column{flex:1 1 auto;min-width:0;min-height:0;height:100%;overflow:hidden}
@@ -530,6 +527,41 @@ body[data-theme="dark"] .create-name-modal .create-name-error{color:#ff9499}
 }
 @media(max-width:360px){.topbar .test-top-badge{display:none}}
 @media(max-width:800px) and (prefers-reduced-motion:reduce){.app>.main>.memo-workspace>.scratch-panel{transition-duration:.01ms!important}}
+
+/* TEST v6.11.1 — polished 雑メモ; the desktop note and its tools never overlap the panel. */
+.memo-column{position:relative;}
+.memo-actions{display:flex;justify-content:flex-end;align-items:center;flex:0 0 48px;min-height:48px;padding:8px 18px 3px;background:var(--bg)}
+.memo-actions .scratch-open-btn{min-height:33px;padding:6px 12px}
+.memo-column>.editor-wrap{padding-top:7px}
+.scratch-panel.scratch-collapsed{display:none;width:0;flex-basis:0}
+.scratch-resize-handle{display:none;flex:0 0 7px;width:7px;min-width:7px;background:transparent;cursor:col-resize;position:relative;z-index:9;touch-action:none;outline:none}
+.memo-workspace.scratch-expanded>.scratch-resize-handle{display:block}
+.scratch-resize-handle::after{content:'';position:absolute;top:0;bottom:0;left:3px;width:1px;background:var(--line)}
+.scratch-resize-handle:hover,.scratch-resize-handle:focus-visible,.scratch-resizing .scratch-resize-handle{background:var(--hover)}
+.scratch-resize-handle:hover::after,.scratch-resizing .scratch-resize-handle::after{width:3px;left:2px;background:var(--accent)}
+.scratch-resizing,.scratch-resizing *{cursor:col-resize!important;user-select:none!important}
+.scratch-resizing .scratch-panel{transition:none!important}
+.scratch-header{height:58px;min-height:58px}
+.scratch-header-title span{display:none}
+.scratch-content{gap:0;padding:12px;min-height:0}
+.scratch-instruction,.scratch-hint,.scratch-fold-btn,.scratch-mobile-back{display:none!important}
+.scratch-text{flex:1 1 auto;min-height:0}
+@media(min-width:801px){
+  .memo-column>.toolbar-shell{position:absolute;right:16px;bottom:72px;left:auto;top:auto;width:max-content;max-width:calc(100% - 32px);margin:0;padding:0;z-index:38;background:transparent;pointer-events:none}
+  .memo-column>.toolbar-shell #editToolbar{max-width:100%;width:max-content;justify-content:flex-start;flex-wrap:wrap;gap:7px;box-sizing:border-box}
+  .memo-column>.toolbar-shell .desktop-color-palette{right:0;max-width:min(300px,calc(100% - 2px))}
+  .memo-column>.toolbar-shell .font-size-menu{max-width:100%}
+}
+@media(max-width:800px){
+  .app>.main>.memo-workspace>.memo-column>.memo-actions{display:none!important}
+  .app>.main>.memo-workspace>.scratch-resize-handle{display:none!important}
+  .app>.main>.memo-workspace>.scratch-panel{display:flex!important;flex-direction:column;width:100%!important;flex-basis:auto!important}
+  .app>.main>.memo-workspace>.scratch-panel .scratch-header-title{display:flex!important}
+  .app>.main>.memo-workspace>.scratch-panel .scratch-header-title span{display:block}
+  .app>.main>.memo-workspace>.scratch-panel .scratch-header{height:60px;min-height:60px}
+  .app>.main>.memo-workspace>.scratch-panel .scratch-content{padding:14px 15px calc(22px + env(safe-area-inset-bottom))}
+  .app>.main>.memo-workspace>.memo-column>.editor-wrap{padding-top:14px}
+}
 </style>
 </head>
 <body>
@@ -576,10 +608,11 @@ body[data-theme="dark"] .create-name-modal .create-name-error{color:#ff9499}
   <main class="main">
     <div class="topbar">
       <button type="button" class="mobile-menu-btn" id="mobileMenuBtn" aria-label="カテゴリー一覧を開く" title="カテゴリー一覧">☰</button><span class="mobile-hash">＃</span><span class="crumb" id="crumb">意識</span>
-      <span class="spacer"></span><button type="button" class="scratch-open-btn" id="scratchOpenBtn" aria-label="走り書きを開く" title="走り書きを開く">走り書き <span aria-hidden="true">›</span></button><span class="test-top-badge">テスト</span><span class="save" id="saveState">保存済み</span>
+      <span class="spacer"></span><span class="test-top-badge">テスト</span><span class="save" id="saveState">保存済み</span>
     </div>
     <div class="memo-workspace" id="memoWorkspace">
       <div class="memo-column" id="memoColumn">
+        <div class="memo-actions"><button type="button" class="scratch-open-btn" id="scratchOpenBtn" aria-expanded="false" aria-controls="scratchPanel" aria-label="雑メモを開く" title="雑メモを開く">雑メモ</button></div>
         <div class="editor-wrap">
       <div class="toolbar-shell" id="toolbarShell">
         <button type="button" id="toolbarToggle" class="toolbar-toggle" aria-controls="editToolbar" aria-expanded="false"><span>✎ 編集ツール</span><span id="toolbarChevron">▾</span></button>
@@ -627,17 +660,14 @@ body[data-theme="dark"] .create-name-modal .create-name-error{color:#ff9499}
       </div>
     </div><!-- /composer-shell -->
       </div><!-- /memo-column -->
-      <section class="scratch-panel" id="scratchPanel" aria-label="走り書き欄">
+      <div class="scratch-resize-handle" id="scratchResizeHandle" role="separator" tabindex="0" aria-label="雑メモの幅を変更" aria-orientation="vertical" title="左右にドラッグして雑メモの幅を変更"></div>
+      <section class="scratch-panel" id="scratchPanel" aria-label="雑メモ欄">
         <div class="scratch-header">
           <button type="button" class="scratch-mobile-menu" id="scratchCategoryBtn" aria-label="カテゴリー一覧へ移動" title="カテゴリー一覧へ移動">☰</button>
-          <button type="button" class="scratch-mobile-back" id="scratchMobileBack" aria-label="メモ内容に戻る" title="メモ内容に戻る">‹</button>
-          <div class="scratch-header-title"><strong>走り書き</strong><span id="scratchChannelTitle">チャンネルごとのメモ</span></div>
-          <button type="button" class="scratch-fold-btn" id="scratchFoldBtn" aria-expanded="true" aria-label="走り書きを閉じる" title="折りたたむ">›</button>
+          <div class="scratch-header-title"><strong>雑メモ</strong><span id="scratchChannelTitle"></span></div>
         </div>
         <div class="scratch-content" id="scratchContent">
-          <label class="scratch-instruction" for="scratchText">思いついたことを自由に書き足せます。</label>
-          <textarea id="scratchText" class="scratch-text" spellcheck="false" placeholder="ここに思いついたことを書いてください…" aria-label="走り書き"></textarea>
-          <p class="scratch-hint">各チャンネル専用・自動保存</p>
+          <textarea id="scratchText" class="scratch-text" spellcheck="false" placeholder="ここに思いついたことを書いてください…" aria-label="雑メモ"></textarea>
         </div>
       </section>
     </div><!-- /memo-workspace -->
@@ -951,9 +981,24 @@ function categoryDeleteRelationsValid(before,after,deletedId,deletedParent){
 }
 
 function ensureCategoryState(){
-  currentGenre().categories.forEach(c=>{}); 
-normalizeCategories(currentGenre().categories);
-  let c=findCategory(data.activeCategoryId); if(!c){c=currentGenre().categories[0];data.activeCategoryId=c?.id;data.activeNoteIndex=0}
+  const cats=currentGenre().categories;
+  normalizeCategories(cats);
+  const c=findCategory(data.activeCategoryId);
+  const index=Number(data.activeNoteIndex);
+  if(c && Number.isInteger(index) && index>=0 && index<c.notes.length)return;
+  // Existing cloud structures may point at an empty category or a deleted channel.
+  // Find an actual channel without changing any category, channel, or parent relation.
+  const firstNote=(nodes)=>{
+    for(const item of (nodes||[])){
+      if(item.notes?.length)return item;
+      const inner=firstNote(item.children);
+      if(inner)return inner;
+    }
+    return null;
+  };
+  const fallback=firstNote(c?.children)||firstNote(cats);
+  if(fallback){data.activeCategoryId=fallback.id;data.activeNoteIndex=0;}
+  else {data.activeCategoryId=c?.id||cats[0]?.id;data.activeNoteIndex=0;}
 }
 let mobileGenreSuppressUntil=0;
 function attachMobileGenreLongPress(b,i){
@@ -1103,10 +1148,12 @@ function enhanceHashtagLinks(){
 function syncScratchView(){
   const n=currentNote();
   const field=document.getElementById('scratchText');
+  if(n&&!n.id)n.id=crypto.randomUUID();
   field.dataset.noteId=n?.id||'';
   field.value=typeof n?.scratch==='string'?n.scratch:'';
   field.disabled=!n;
-  document.getElementById('scratchChannelTitle').textContent=n?'# '+(n.title||'無題'):'チャンネルがありません';
+  field.placeholder=n?'ここに思いついたことを書いてください…':'チャンネルを選択してください';
+  document.getElementById('scratchChannelTitle').textContent=n?'# '+(n.title||'無題'):'';
 }
 function saveScratchToCurrent(){
   const n=currentNote(),field=document.getElementById('scratchText');
@@ -2076,23 +2123,69 @@ if('serviceWorker' in navigator){
 normalizeCategories(currentGenre().categories);if(!data.activeCategoryId)data.activeCategoryId=currentGenre().categories[0]?.id;data.activeNoteIndex=data.activeNoteIndex??data.active[1]??0;assignIds();_localSave();setupResize();renderAll();loadNote();
 
 
-/* Test v6.11.0: scratchpad entry and desktop collapse state. */
+/* TEST v6.11.1: fully closable desktop 雑メモ with persistent, draggable width. */
 (function(){
+ const workspace=document.getElementById('memoWorkspace');
  const panel=document.getElementById('scratchPanel');
  const field=document.getElementById('scratchText');
- const fold=document.getElementById('scratchFoldBtn');
- const key='memoScratchPanelExpanded_TESTV1';
+ const button=document.getElementById('scratchOpenBtn');
+ const handle=document.getElementById('scratchResizeHandle');
+ const key='memoScratchPanelExpanded_TESTV1'; // Keep users' previous toggle preference.
+ const widthKey='memoScratchWidth_TESTV1';
+ let preferred=310;
+ try {const saved=Number(localStorage.getItem(widthKey));if(Number.isFinite(saved)&&saved>=180)preferred=saved;}catch(e){}
+ function limits(){
+   const w=workspace.clientWidth||800;
+   return {min:Math.min(230,Math.max(150,w*.27)),max:Math.max(150,Math.min(660,w-320))};
+ }
+ function applyWidth(){
+   const {min,max}=limits();
+   const width=Math.max(Math.min(min,max),Math.min(max,preferred));
+   workspace.style.setProperty('--scratch-width',width+'px');
+   handle.setAttribute('aria-valuemin',String(Math.round(Math.min(min,max))));
+   handle.setAttribute('aria-valuemax',String(Math.round(max)));
+   handle.setAttribute('aria-valuenow',String(Math.round(width)));
+ }
  window.setScratchExpanded=function(expanded){
+   workspace.classList.toggle('scratch-expanded',expanded);
    panel.classList.toggle('scratch-collapsed',!expanded);
    document.querySelector('.app>.main').classList.toggle('scratch-expanded',expanded);
-   fold.setAttribute('aria-expanded',String(expanded));
-   fold.setAttribute('aria-label',expanded?'走り書きを折りたたむ':'走り書きを展開する');
-   fold.title=expanded?'折りたたむ':'走り書きを開く';
+   button.setAttribute('aria-expanded',String(expanded));
+   button.setAttribute('aria-label',expanded?'雑メモを閉じる':'雑メモを開く');
+   button.title=expanded?'雑メモを閉じる':'雑メモを開く';
    try{localStorage.setItem(key,expanded?'1':'0')}catch(e){}
+   applyWidth();
  };
- let expanded=true;try{expanded=localStorage.getItem(key)!=='0'}catch(e){}
+ let expanded=false;
+ try{expanded=localStorage.getItem(key)==='1'}catch(e){}
  setScratchExpanded(expanded);
- fold.addEventListener('click',()=>setScratchExpanded(panel.classList.contains('scratch-collapsed')));
+ button.addEventListener('click',()=>{
+   if(!window.matchMedia('(max-width:800px)').matches)setScratchExpanded(!workspace.classList.contains('scratch-expanded'));
+ });
+ let drag=null;
+ handle.addEventListener('pointerdown',e=>{
+   if(e.button!==0||window.matchMedia('(max-width:800px)').matches)return;
+   drag={x:e.clientX,width:panel.getBoundingClientRect().width};
+   handle.setPointerCapture(e.pointerId);
+   document.body.classList.add('scratch-resizing');
+   e.preventDefault();
+ });
+ handle.addEventListener('pointermove',e=>{
+   if(!drag)return;
+   preferred=drag.width+drag.x-e.clientX;
+   applyWidth();
+ });
+ function finish(){if(!drag)return;drag=null;document.body.classList.remove('scratch-resizing');try{localStorage.setItem(widthKey,String(Math.round(preferred)))}catch(e){}}
+ handle.addEventListener('pointerup',finish);
+ handle.addEventListener('pointercancel',finish);
+ handle.addEventListener('lostpointercapture',finish);
+ handle.addEventListener('keydown',e=>{
+   if(!['ArrowLeft','ArrowRight'].includes(e.key))return;
+   e.preventDefault();preferred=panel.getBoundingClientRect().width+(e.key==='ArrowLeft'?20:-20);
+   applyWidth();try{localStorage.setItem(widthKey,String(Math.round(preferred)))}catch(e){}
+ });
+ if(window.ResizeObserver)new ResizeObserver(applyWidth).observe(workspace);
+ else window.addEventListener('resize',applyWidth);
  field.addEventListener('input',saveScratchToCurrent);
  field.addEventListener('change',saveScratchToCurrent);
  field.addEventListener('blur',saveScratchToCurrent);
@@ -2297,11 +2390,6 @@ normalizeCategories(currentGenre().categories);if(!data.activeCategoryId)data.ac
       document.getElementById('scratchPanel').style.removeProperty('transform');
     }
     $('#mobileMenuBtn').onclick=()=>setView('list');
-    $('#scratchOpenBtn').onclick=()=>{
-      if(mobile())setView('scratch');
-      else setScratchExpanded(document.getElementById('scratchPanel').classList.contains('scratch-collapsed'));
-    };
-    $('#scratchMobileBack').onclick=()=>setView('memo');
     $('#scratchCategoryBtn').onclick=()=>{
       if(!mobile())return;
       // Two quick sequential rightward swipes: scratch -> memo -> categories.
@@ -2389,7 +2477,7 @@ normalizeCategories(currentGenre().categories);if(!data.activeCategoryId)data.ac
 /* v6.5: PWA update detection + user-initiated safe refresh. */
 (function(){
  'use strict';
- const INSTALLED_BUILD='6.11.0';
+ const INSTALLED_BUILD='6.11.1';
  const intervalMs=10*60*1000;
  const status=document.getElementById('appUpdateStatus');
  const buildLabel=document.getElementById('appBuildLabel');
@@ -2548,7 +2636,8 @@ normalizeCategories(currentGenre().categories);if(!data.activeCategoryId)data.ac
         }
       }
     }else{
-      if(toolbar.parentElement!==memoScroll)memoScroll.insertBefore(toolbar,memoScroll.firstChild);
+      // Anchor tools inside the memo column so resizing the right pane cannot overlap it.
+      if(toolbar.parentElement!==main)main.insertBefore(toolbar,memoScroll);
       document.documentElement.style.removeProperty('--memo-mobile-viewport');
     }
   }
