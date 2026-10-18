@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#2f2419">
-<link rel="manifest" href="manifest.webmanifest?v=67">
-<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=67">
+<link rel="manifest" href="manifest.webmanifest?v=671">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=671">
 <title>メモ帳テスト</title>
 <style>
 :root{
@@ -400,6 +400,15 @@ body[data-theme="dark"] .font-size-menu button:hover,body[data-theme="dark"] .fo
   .app>.main>.toolbar-shell #editToolbar{margin-top:7px;max-height:min(33dvh,190px);overflow-x:hidden;overflow-y:auto;justify-content:flex-start;overscroll-behavior:contain}
   .app>.main>.toolbar-shell #editToolbar.is-folded{display:none}
   .app>.main>.editor-wrap{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding-top:12px}
+}
+
+
+/* Test v6.7.1 — phone is for reading and quick plain text edits.
+   Only the formatting toolbar is hidden; #editor remains contenteditable. */
+@media (max-width:800px){
+  .app>.main>.toolbar-shell,
+  #toolbarShell { display:none !important; }
+  .app>.main>.editor-wrap {padding-top:14px; flex:1 1 auto; min-height:0;}
 }
 
 </style>
@@ -1821,13 +1830,55 @@ normalizeCategories(currentGenre().categories);if(!data.activeCategoryId)data.ac
   $('#composerAddVideo').addEventListener('click',()=>{ closeComposerMenus(); $('#videoInput').click(); });
   document.addEventListener('click',e=>{ if(!e.target.closest('#composerShell')) closeComposerMenus(); }, true);
 
-  // Closing a popup by tapping outside must not also select the tapped channel/category.
+  // Only one editor popup may be open at a time. When dismissing a popup by
+  // clicking/tapping outside, consume that click so the covered channel or
+  // category does not accidentally run its own handler.
+  const fontMenu=$('#desktopFontSizeMenu');
+  const fontButton=$('#desktopFontSizeBtn');
+  const closeFontMenu=()=>{
+    fontMenu.hidden=true;
+    fontButton.setAttribute('aria-expanded','false');
+  };
+  const closeOpenEditorMenus=()=>{closeFontMenu();closePalette();};
   document.addEventListener('click',e=>{
-    const opened=$$('.cat-menu.show,.note-menu.show,.context-menu.show');
-    if(!opened.length || e.target.closest('.cat-menu.show,.note-menu.show,.context-menu.show'))return;
-    closeAllMenus();
-    e.preventDefault();
-    e.stopImmediatePropagation();
+    const target=e.target;
+    const menuSelector='.cat-menu.show,.note-menu.show,.context-menu.show';
+    const sideOpen=!!$(menuSelector);
+    const fontOpen=!fontMenu.hidden;
+    const colorOpen=!palette.hidden;
+    const otherOpen=!!$('#composerAttachMenu.show');
+
+    // Existing side menus take precedence: first outside click only dismisses.
+    if(sideOpen){
+      if(target.closest(menuSelector))return;
+      closeAllMenus(); closeOpenEditorMenus();
+      e.preventDefault();e.stopImmediatePropagation();
+      return;
+    }
+
+    if(fontOpen||colorOpen){
+      // Switching directly between the two controls takes one click.
+      // Dismiss the other popup before the button's own click handler runs.
+      if(target.closest('#desktopFontSizeBtn')){
+        closePalette();
+        return;
+      }
+      if(target.closest('#desktopColorBtn')){
+        closeFontMenu();
+        return;
+      }
+      // Buttons and swatches inside the open popup must remain interactive.
+      if(fontOpen&&target.closest('#desktopFontSizeMenu'))return;
+      if(colorOpen&&target.closest('#desktopColorPalette'))return;
+      closeOpenEditorMenus();
+      e.preventDefault();e.stopImmediatePropagation();
+      return;
+    }
+
+    if(otherOpen && !target.closest('#composerAttachMenu,#composerPlusBtn')){
+      closeComposerMenus();
+      e.preventDefault();e.stopImmediatePropagation();
+    }
   },true);
 
   // Improve mobile swipe sensitivity and slide feel.
@@ -1893,7 +1944,7 @@ normalizeCategories(currentGenre().categories);if(!data.activeCategoryId)data.ac
 /* v6.5: PWA update detection + user-initiated safe refresh. */
 (function(){
  'use strict';
- const INSTALLED_BUILD='6.7.0';
+ const INSTALLED_BUILD='6.7.1';
  const intervalMs=10*60*1000;
  const status=document.getElementById('appUpdateStatus');
  const buildLabel=document.getElementById('appBuildLabel');
@@ -2024,9 +2075,8 @@ normalizeCategories(currentGenre().categories);if(!data.activeCategoryId)data.ac
     closeSizePicker();
     cmd('fontSize',size);
   });
-  document.addEventListener('pointerdown',e=>{
-    if(!e.target.closest('.font-size-control'))closeSizePicker();
-  },true);
+  // Outside dismissal and interaction shielding are handled by the single
+  // capturing click handler below, shared with the color popup and side menus.
   document.addEventListener('keydown',e=>{
     if(e.key==='Escape')closeSizePicker();
   });
