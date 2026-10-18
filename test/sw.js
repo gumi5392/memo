@@ -1,5 +1,5 @@
-/* Network-first service worker for the note app. v6.7.1 */
-const MEMO_SW_BUILD='6.7.1-test.1';
+/* Network-first service worker for the note app. v6.8.0 */
+const MEMO_SW_BUILD='6.8.0-test.1';
 self.addEventListener('install',event=>{
   event.waitUntil(self.skipWaiting());
 });

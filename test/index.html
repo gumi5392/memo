@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#2f2419">
-<link rel="manifest" href="manifest.webmanifest?v=671">
-<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=671">
+<link rel="manifest" href="manifest.webmanifest?v=680">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=680">
 <title>メモ帳テスト</title>
 <style>
 :root{
@@ -228,7 +228,7 @@ html,body{height:100%;overscroll-behavior:none}
 .toolbar{max-height:44dvh;overflow-y:auto;overscroll-behavior:contain}
 .context-menu,.cat-menu,.note-menu{max-width:calc(100vw - 16px);max-height:calc(100dvh - 16px);overflow-y:auto}
 @media(max-width:800px){
-  /* Three panels occupy fixed tracks and move together; panels remain mounted to preserve scroll positions. */
+  /* Three panels stay mounted to preserve scroll positions. Navigation is overridden below to move only the memo. */
   .app,body.mobile-list .app{--nav-offset:0px;display:block!important;position:relative;width:100%;height:100vh;height:100dvh;min-width:0!important;overflow:hidden}
   body.mobile-list .app{--nav-offset:100vw}
   .app>.servers,.app>.sidebar,.app>.main{position:absolute;top:0;height:100%;max-height:100%;min-height:0;display:flex!important;transition:transform 280ms cubic-bezier(.22,.80,.22,1);will-change:transform}
@@ -409,6 +409,35 @@ body[data-theme="dark"] .font-size-menu button:hover,body[data-theme="dark"] .fo
   .app>.main>.toolbar-shell,
   #toolbarShell { display:none !important; }
   .app>.main>.editor-wrap {padding-top:14px; flex:1 1 auto; min-height:0;}
+}
+
+
+/* TEST v6.8.0: stationary category drawer behind a sliding memo sheet.
+   Only the memo pane translates. The icon rail and category list stay put. */
+@media (max-width:800px){
+  .app>.servers,
+  .app>.sidebar,
+  .app.nav-dragging>.servers,
+  .app.nav-dragging>.sidebar{
+    transform:translate3d(0,0,0) !important;
+    transition:none !important;
+    will-change:auto;
+  }
+  .app>.servers{z-index:1}
+  .app>.sidebar{z-index:1}
+  .app>.main{
+    z-index:3;
+    transform:translate3d(var(--nav-offset),0,0);
+    transition:transform 300ms cubic-bezier(.22,.79,.21,1);
+    box-shadow:-9px 0 25px rgba(34,24,15,.24);
+    backface-visibility:hidden;
+  }
+  .app.nav-dragging>.main{transition:none !important}
+  body.mobile-list .app>.main{pointer-events:none}
+  body:not(.mobile-list) .app>.main{pointer-events:auto}
+}
+@media(max-width:800px) and (prefers-reduced-motion:reduce){
+  .app>.main{transition-duration:.01ms!important}
 }
 
 </style>
@@ -1944,7 +1973,7 @@ normalizeCategories(currentGenre().categories);if(!data.activeCategoryId)data.ac
 /* v6.5: PWA update detection + user-initiated safe refresh. */
 (function(){
  'use strict';
- const INSTALLED_BUILD='6.7.1';
+ const INSTALLED_BUILD='6.8.0';
  const intervalMs=10*60*1000;
  const status=document.getElementById('appUpdateStatus');
  const buildLabel=document.getElementById('appBuildLabel');
