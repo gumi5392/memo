@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#2f2419">
 <link rel="manifest" href="manifest.webmanifest?v=680">
-<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=680">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=690">
 <title>メモ帳テスト</title>
 <style>
 :root{
@@ -440,6 +440,21 @@ body[data-theme="dark"] .font-size-menu button:hover,body[data-theme="dark"] .fo
   .app>.main{transition-duration:.01ms!important}
 }
 
+
+/* TEST v6.9.0: create-category and create-channel name dialogs */
+.create-name-modal{width:min(420px,calc(100vw - 28px))}
+.create-name-modal h2{margin:0 0 6px}
+.create-name-modal .create-name-description{margin:0 0 15px;font-size:13px;line-height:1.55}
+.create-name-modal label{font-weight:600;margin:0 0 7px}
+.create-name-modal input[type=text]{box-sizing:border-box;display:block;width:100%;font-size:16px;min-height:43px}
+.create-name-modal input[type=text]:focus{border-color:var(--accent);box-shadow:0 0 0 2px rgba(30,137,100,.13)}
+.create-name-modal .create-name-error{min-height:18px;margin:6px 0 0;font-size:12px;color:#b4232e}
+.create-name-modal .modal-actions{margin-top:14px}
+body[data-theme="dark"] .create-name-modal .create-name-error{color:#ff9499}
+@media(max-width:800px){
+ .create-name-modal{max-height:calc(var(--memo-mobile-viewport,100dvh) - 24px);overflow-y:auto}
+}
+
 </style>
 </head>
 <body>
@@ -589,7 +604,7 @@ body[data-theme="dark"] .font-size-menu button:hover,body[data-theme="dark"] .fo
       <button class="theme-option dark" id="themeDark"><span class="preview"><span class="p-side"></span><span class="p-main"></span></span><strong>ダーク</strong><span>これまでの配色</span></button>
     </div>
     <div class="app-update-settings" aria-live="polite">
-      <div class="app-update-heading"><strong>アプリの更新</strong><span id="appBuildLabel">v6.6</span></div>
+      <div class="app-update-heading"><strong>アプリの更新</strong><span id="appBuildLabel">v6.9.0</span></div>
       <p id="appUpdateStatus">更新情報を確認しています…</p>
       <div class="app-update-actions">
         <button type="button" id="appCheckUpdate">更新を確認</button>
@@ -604,6 +619,21 @@ body[data-theme="dark"] .font-size-menu button:hover,body[data-theme="dark"] .fo
     <h2 id="confirmTitle">削除の確認</h2>
     <p class="confirm-text" id="confirmMessage"></p>
     <div class="modal-actions"><button id="confirmCancel">キャンセル</button><button class="danger-fill" id="confirmOk">削除</button></div>
+  </div>
+</div>
+
+
+<div class="modal-back" id="createNameBack">
+  <div class="modal create-name-modal" role="dialog" aria-modal="true" aria-labelledby="createNameTitle" aria-describedby="createNameDescription">
+    <h2 id="createNameTitle">カテゴリーを追加</h2>
+    <p id="createNameDescription" class="create-name-description">名前を入力してから作成します。</p>
+    <label for="createNameInput" id="createNameLabel">カテゴリー名</label>
+    <input type="text" id="createNameInput" placeholder="カテゴリー名" autocomplete="off" maxlength="100" aria-describedby="createNameError">
+    <p class="create-name-error" id="createNameError" role="status" aria-live="polite"></p>
+    <div class="modal-actions">
+      <button type="button" id="createNameCancel">キャンセル</button>
+      <button type="button" class="primary" id="createNameConfirm">追加</button>
+    </div>
   </div>
 </div>
 
@@ -1056,46 +1086,109 @@ function moveCategoryById(fromId,toId){
   save();renderCategories();loadNote();
 }
 function moveNoteById(catId,from,to){const c=findCategory(catId);if(!c||from===to)return;const item=c.notes.splice(from,1)[0];c.notes.splice(to,0,item);if(data.activeCategoryId===catId)data.activeNoteIndex=(data.activeNoteIndex===from?to:data.activeNoteIndex);save();renderCategories();loadNote()}
-function askCategoryName(){
-  const v=prompt("カテゴリー名を入力してください");
-  if(v===null)return null;
-  const name=v.trim();
-  if(!name){alert("カテゴリー名を入力してください。");return null}
-  return name;
+// Dialogs collect names before touching categories or channels.
+// The target category ID is captured when the dialog opens, not read again
+// from the context menu after the user has edited the name.
+let pendingCreateName=null;
+function openCreateNameModal(kind, placement='root', categoryId=null){
+  closeAllMenus();
+  closeGenreSettings();
+  const back=document.getElementById('createNameBack');
+  const input=document.getElementById('createNameInput');
+  const error=document.getElementById('createNameError');
+  const category=categoryId?findCategory(categoryId):null;
+  if((kind==='channel'||placement!=='root')&&!category)return;
+  pendingCreateName={kind,placement,categoryId,genreIndex:data.activeGenre};
+  const title=kind==='channel'?'チャンネルを追加':'カテゴリーを追加';
+  const desc=kind==='channel'
+    ? `「${category.name}」に新しいチャンネルを作成します。`
+    : placement==='child' ? `「${category.name}」の下にカテゴリーを追加します。`
+    : placement==='parent' ? `「${category.name}」の上に親カテゴリーを追加します。`
+    : 'カテゴリー一覧に新しいカテゴリーを追加します。';
+  document.getElementById('createNameTitle').textContent=title;
+  document.getElementById('createNameDescription').textContent=desc;
+  document.getElementById('createNameLabel').textContent=kind==='channel'?'チャンネル名':'カテゴリー名';
+  input.placeholder=kind==='channel'?'例：イングリッド':'例：キャラ対';
+  input.value='';
+  input.removeAttribute('aria-invalid');
+  error.textContent='';
+  back.classList.add('show');
+  requestAnimationFrame(()=>input.focus());
 }
-function addRootCategory(){
-  const categoryNotesBefore=snapshotCategoryNotes();
-  const name=askCategoryName();if(!name)return;
-  pushCategoryUndo();
-  const g=currentGenre();
-  const c={id:crypto.randomUUID(),name,open:true,children:[],notes:[{title:"新しいチャンネル",html:"<p></p>"}]};
-  g.categories.push(c);
-  data.activeCategoryId=c.id;data.activeNoteIndex=0;
-  restoreCategoryNotes(categoryNotesBefore);
-  save();closeAllMenus();renderCategories();loadNote();
+function closeCreateNameModal(){
+  document.getElementById('createNameBack').classList.remove('show');
+  pendingCreateName=null;
 }
-function addChildCategory(){
-  const categoryNotesBefore=snapshotCategoryNotes();
-  const p=findCategory(menuCatIndex);if(!p)return;
-  const name=askCategoryName();if(!name)return;
-  pushCategoryUndo();
-  const c={id:crypto.randomUUID(),name,open:true,children:[],notes:[{title:"新しいチャンネル",html:"<p></p>"}]};
-  p.children.push(c);p.open=true;
-  data.activeCategoryId=c.id;data.activeNoteIndex=0;
-  restoreCategoryNotes(categoryNotesBefore);
-  save();closeAllMenus();renderCategories();loadNote();
+function confirmCreateName(){
+  const context=pendingCreateName;
+  if(!context)return;
+  const input=document.getElementById('createNameInput');
+  const name=input.value.trim();
+  if(!name){
+    document.getElementById('createNameError').textContent=(context.kind==='channel'?'チャンネル名':'カテゴリー名')+'を入力してください。';
+    input.setAttribute('aria-invalid','true');
+    input.focus();
+    return;
+  }
+  // A stale dialog must never add a channel to another memo group.
+  if(context.genreIndex!==data.activeGenre){closeCreateNameModal();return;}
+  if(context.kind==='channel'){
+    const c=findCategory(context.categoryId);
+    if(!c){closeCreateNameModal();return;}
+    saveCurrent();
+    c.notes.push({title:name,html:'<p></p>'});
+    c.open=true;
+    data.activeCategoryId=c.id;
+    data.activeNoteIndex=c.notes.length-1;
+    save();
+    closeCreateNameModal();
+    renderCategories();loadNote();
+    if(window.matchMedia('(max-width:800px)').matches)document.body.classList.remove('mobile-list');
+    return;
+  }
+  const notesBefore=snapshotCategoryNotes();
+  let created=null;
+  if(context.placement==='root'){
+    const g=currentGenre();
+    pushCategoryUndo();
+    created={id:crypto.randomUUID(),name,open:true,fontSize:16,children:[],notes:[{title:'新しいチャンネル',html:'<p></p>'}]};
+    g.categories.push(created);
+    data.activeCategoryId=created.id;data.activeNoteIndex=0;
+  }else if(context.placement==='child'){
+    const parent=findCategory(context.categoryId);
+    if(!parent){closeCreateNameModal();return;}
+    pushCategoryUndo();
+    created={id:crypto.randomUUID(),name,open:true,children:[],notes:[{title:'新しいチャンネル',html:'<p></p>'}]};
+    parent.children.push(created);parent.open=true;
+    data.activeCategoryId=created.id;data.activeNoteIndex=0;
+  }else if(context.placement==='parent'){
+    const info=findCategoryInfo(context.categoryId);
+    if(!info){closeCreateNameModal();return;}
+    pushCategoryUndo();
+    created={id:crypto.randomUUID(),name,open:true,children:[info.node],notes:[]};
+    info.arr.splice(info.index,1,created);
+    data.activeCategoryId=info.node.id;data.activeNoteIndex=0;
+  }
+  if(!created)return;
+  restoreCategoryNotes(notesBefore);
+  save();
+  closeCreateNameModal();
+  renderCategories();loadNote();
 }
-function addParentCategory(){
-  const categoryNotesBefore=snapshotCategoryNotes();
-  const info=findCategoryInfo(menuCatIndex);if(!info)return;
-  const name=askCategoryName();if(!name)return;
-  pushCategoryUndo();
-  const parent={id:crypto.randomUUID(),name,open:true,children:[info.node],notes:[]};
-  info.arr.splice(info.index,1,parent);
-  data.activeCategoryId=info.node.id;data.activeNoteIndex=0;
-  restoreCategoryNotes(categoryNotesBefore);
-  save();closeAllMenus();renderCategories();loadNote();
-}
+function addRootCategory(){openCreateNameModal('category','root');}
+function addChildCategory(){openCreateNameModal('category','child',menuCatIndex);}
+function addParentCategory(){openCreateNameModal('category','parent',menuCatIndex);}
+document.getElementById('createNameConfirm').addEventListener('click',confirmCreateName);
+document.getElementById('createNameCancel').addEventListener('click',closeCreateNameModal);
+document.getElementById('createNameBack').addEventListener('click',e=>{if(e.target.id==='createNameBack')closeCreateNameModal()});
+document.getElementById('createNameInput').addEventListener('input',()=>{
+  document.getElementById('createNameError').textContent='';
+  document.getElementById('createNameInput').removeAttribute('aria-invalid');
+});
+document.getElementById('createNameInput').addEventListener('keydown',e=>{
+  if(e.key==='Enter'){e.preventDefault();confirmCreateName();}
+  else if(e.key==='Escape'){e.preventDefault();closeCreateNameModal();}
+});
 const CATEGORY_UNDO_KEY=KEY+"_categoryUndo";
 function pushCategoryUndo(){
   try{
@@ -1142,7 +1235,7 @@ function renameCategory2(id){
   };
 }
 
-function addNoteToCategory(id){const c=findCategory(id);if(!c)return;c.notes.push({title:"新しいメモ",html:"<p></p>"});c.open=true;data.activeCategoryId=id;data.activeNoteIndex=c.notes.length-1;save();closeAllMenus();renderCategories();loadNote()}
+function addNoteToCategory(id){openCreateNameModal('channel','root',id);}
 function openConfirmModal(message,onOk){
   const back=document.getElementById("confirmBack");
   const msg=document.getElementById("confirmMessage");
@@ -1358,13 +1451,7 @@ document.getElementById("genreImage").onchange=e=>{
 document.getElementById("genreMenuBtn").onclick=e=>{e.preventDefault();e.stopPropagation();closeContext();openGenreSettings(e.clientX,e.clientY)};
 document.getElementById("genreAddCategoryBtn").onclick=e=>{
   e.preventDefault();e.stopPropagation();
-  const name=askCategoryName();if(!name)return;
-  pushCategoryUndo();
-  const g=currentGenre();
-  const c={id:crypto.randomUUID(),name,open:true,fontSize:16,children:[],notes:[{title:"新しいチャンネル",html:"<p></p>"}]};
-  g.categories.push(c);
-  data.activeCategoryId=c.id;data.activeNoteIndex=0;
-  save();closeGenreSettings();renderCategories();loadNote();
+  addRootCategory();
 };
 document.getElementById("genreUndoBtn").onclick=e=>{
   e.preventDefault();e.stopPropagation();undoCategoryOperation();closeGenreSettings();
@@ -1973,7 +2060,7 @@ normalizeCategories(currentGenre().categories);if(!data.activeCategoryId)data.ac
 /* v6.5: PWA update detection + user-initiated safe refresh. */
 (function(){
  'use strict';
- const INSTALLED_BUILD='6.8.0';
+ const INSTALLED_BUILD='6.9.0';
  const intervalMs=10*60*1000;
  const status=document.getElementById('appUpdateStatus');
  const buildLabel=document.getElementById('appBuildLabel');
