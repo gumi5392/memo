@@ -562,6 +562,12 @@ body[data-theme="dark"] .create-name-modal .create-name-error{color:#ff9499}
   .app>.main>.memo-workspace>.scratch-panel .scratch-content{padding:14px 15px calc(22px + env(safe-area-inset-bottom))}
   .app>.main>.memo-workspace>.memo-column>.editor-wrap{padding-top:14px}
 }
+/* TEST v6.12.0: independent memo edit history buttons. */
+.memo-history-btn{min-width:35px;font-family:Arial,sans-serif!important;font-size:23px!important;font-weight:650;line-height:1!important;padding:4px 7px!important}
+.memo-history-btn:disabled{opacity:.38;cursor:not-allowed!important}
+.memo-history-btn:not(:disabled):hover{background:var(--hover)!important}
+.memo-history-divider{align-self:stretch;width:1px;min-height:23px;background:var(--line);margin:2px 2px}
+@media(max-width:800px){#memoUndoBtn,#memoRedoBtn,.memo-history-divider{display:none!important}}
 </style>
 </head>
 <body>
@@ -617,6 +623,9 @@ body[data-theme="dark"] .create-name-modal .create-name-error{color:#ff9499}
       <div class="toolbar-shell" id="toolbarShell">
         <button type="button" id="toolbarToggle" class="toolbar-toggle" aria-controls="editToolbar" aria-expanded="false"><span>✎ 編集ツール</span><span id="toolbarChevron">▾</span></button>
         <div class="toolbar is-folded" id="editToolbar">
+          <button type="button" class="memo-history-btn" id="memoUndoBtn" title="メモ本文の操作を戻す（Ctrl+Z）" aria-label="メモ本文の操作を戻す" disabled>↶</button>
+          <button type="button" class="memo-history-btn" id="memoRedoBtn" title="メモ本文の操作をやり直す（Ctrl+Y）" aria-label="メモ本文の操作をやり直す" disabled>↷</button>
+          <span class="memo-history-divider" aria-hidden="true"></span>
           <button type="button" data-cmd="bold" title="太字"><b>B</b></button>
           <button type="button" data-cmd="italic" title="斜体"><i>I</i></button>
           <button type="button" data-cmd="underline" title="下線"><u>U</u></button>
@@ -726,7 +735,7 @@ body[data-theme="dark"] .create-name-modal .create-name-error{color:#ff9499}
       <button class="theme-option dark" id="themeDark"><span class="preview"><span class="p-side"></span><span class="p-main"></span></span><strong>ダーク</strong><span>これまでの配色</span></button>
     </div>
     <div class="app-update-settings" aria-live="polite">
-      <div class="app-update-heading"><strong>アプリの更新</strong><span id="appBuildLabel">v6.11.0</span></div>
+      <div class="app-update-heading"><strong>アプリの更新</strong><span id="appBuildLabel">v6.12.0</span></div>
       <p id="appUpdateStatus">更新情報を確認しています…</p>
       <div class="app-update-actions">
         <button type="button" id="appCheckUpdate">更新を確認</button>
@@ -822,7 +831,8 @@ body[data-theme="dark"] .create-name-modal .create-name-error{color:#ff9499}
 <div class="context-menu" id="genreSettingsMenu">
   <button id="genreRenameFromSettingsBtn">メモ名を編集</button>
   <button id="genreAddCategoryBtn">カテゴリーを追加</button>
-  <button id="genreUndoBtn">操作を戻す</button>
+  <button id="genreUndoBtn" title="カテゴリーとチャンネルの操作を戻す">操作を戻す</button>
+  <button id="genreRedoBtn" title="カテゴリーとチャンネルの操作をやり直す">操作をやり直す</button>
 </div>
 
 
@@ -1279,6 +1289,8 @@ function moveCategoryById(fromId,toId){
   for(let x=dst.node;x;){if(x.id===fromId)return;const info=findCategoryInfo(x.id);x=info?.parent}
   const snapshot=snapshotCategoryNotes();
   const node=src.node;
+  // Snapshot the category arrangement before drag-and-drop moves it.
+  pushCategoryUndo();
   src.arr.splice(src.index,1);
   const targetArr=dst.parent?dst.parent.children:currentGenre().categories;
   const targetIndex=targetArr.indexOf(dst.node);
@@ -1287,7 +1299,17 @@ function moveCategoryById(fromId,toId){
   restoreCategoryNotes(snapshot);
   save();renderCategories();loadNote();
 }
-function moveNoteById(catId,from,to){const c=findCategory(catId);if(!c||from===to)return;const item=c.notes.splice(from,1)[0];c.notes.splice(to,0,item);if(data.activeCategoryId===catId)data.activeNoteIndex=(data.activeNoteIndex===from?to:data.activeNoteIndex);save();renderCategories();loadNote()}
+function moveNoteById(catId,from,to){
+  const c=findCategory(catId);if(!c||from===to||!c.notes[from]||!c.notes[to])return;
+  saveCurrent();pushCategoryUndo();
+  const activeId=currentNote()?.id;
+  const item=c.notes.splice(from,1)[0];c.notes.splice(to,0,item);
+  if(data.activeCategoryId===catId){
+    const index=c.notes.findIndex(n=>n.id===activeId);
+    if(index>=0)data.activeNoteIndex=index;
+  }
+  save();renderCategories();loadNote();
+}
 // Dialogs collect names before touching categories or channels.
 // The target category ID is captured when the dialog opens, not read again
 // from the context menu after the user has edited the name.
@@ -1338,6 +1360,7 @@ function confirmCreateName(){
     const c=findCategory(context.categoryId);
     if(!c){closeCreateNameModal();return;}
     saveCurrent();
+    pushCategoryUndo();
     c.notes.push({title:name,html:'<p></p>'});
     c.open=true;
     data.activeCategoryId=c.id;
@@ -1391,27 +1414,104 @@ document.getElementById('createNameInput').addEventListener('keydown',e=>{
   if(e.key==='Enter'){e.preventDefault();confirmCreateName();}
   else if(e.key==='Escape'){e.preventDefault();closeCreateNameModal();}
 });
-const CATEGORY_UNDO_KEY=KEY+"_categoryUndo";
-function pushCategoryUndoSnapshot(categoriesBefore=null){
+/* TEST v6.12.0: category/channel undo and redo have their own stacks,
+   independent of memo body/title/scratch edits and of other memo groups. */
+const CATEGORY_UNDO_KEY=KEY+'_categoryHistoryV2';
+const CATEGORY_HISTORY_LIMIT=25;
+function readCategoryHistory(){
   try{
-    const stack=JSON.parse(localStorage.getItem(CATEGORY_UNDO_KEY)||"[]");
-    const state=JSON.parse(JSON.stringify(data));
-    if(categoriesBefore)state.genres[state.activeGenre].categories=categoriesBefore;
-    stack.push(state);
-    if(stack.length>30)stack.shift();
-    localStorage.setItem(CATEGORY_UNDO_KEY,JSON.stringify(stack));
-  }catch(e){}
+    const saved=JSON.parse(localStorage.getItem(CATEGORY_UNDO_KEY)||'{}');
+    return saved && typeof saved==='object' && !Array.isArray(saved) ? saved : {};
+  }catch(e){return {}}
 }
-function pushCategoryUndo(){pushCategoryUndoSnapshot();}
-function undoCategoryOperation(){
+function writeCategoryHistory(all){
+  try{localStorage.setItem(CATEGORY_UNDO_KEY,JSON.stringify(all));return true}
+  catch(e){openInfoModal('操作履歴を端末に保存できませんでした。ストレージの空き容量を確認してください。','履歴の保存に失敗');return false}
+}
+function clearCategoryHistories(){
+  try{localStorage.removeItem(CATEGORY_UNDO_KEY)}catch(e){}
+}
+function categoryHistoryGenreId(){
+  const g=currentGenre();if(g&&!g.id)g.id=crypto.randomUUID();return g?.id||null;
+}
+function captureCategoryHistory(categoriesBefore=null,options={}){
+  const cat=currentCat(), note=currentNote();
+  return {
+    genreId:categoryHistoryGenreId(),
+    categories:structuredClone(categoriesBefore || currentGenre().categories),
+    categoryId:cat?.id||data.activeCategoryId,
+    noteId:note?.id||null,
+    noteTitleScope:options.noteTitleScope||null
+  };
+}
+function pushCategoryUndoSnapshot(categoriesBefore=null,options={}){
+  const entry=captureCategoryHistory(categoriesBefore,options);
+  if(!entry.genreId)return;
+  const all=readCategoryHistory();const stacks=all[entry.genreId]||{undo:[],redo:[]};
+  stacks.undo.push(entry);
+  if(stacks.undo.length>CATEGORY_HISTORY_LIMIT)stacks.undo.shift();
+  stacks.redo=[];
+  all[entry.genreId]=stacks;writeCategoryHistory(all);
+}
+function pushCategoryUndo(options={}){pushCategoryUndoSnapshot(null,options)}
+function applyCategoryHistory(entry){
+  // Flush the current live memo before replacing the tree. An undo/redo must
+  // never silently roll back the current body, title or scratchpad.
+  saveCurrent();
+  const g=currentGenre();
+  if(!entry || entry.genreId!==g.id || !Array.isArray(entry.categories))throw Error('履歴の対象が異なります');
+  const liveNotes=allLocalNotes();
+  const restored=structuredClone(entry.categories);
+  const walk=nodes=>nodes.forEach(c=>{
+    c.notes=(c.notes||[]).map(saved=>{
+      const live=liveNotes.get(saved.id);
+      if(!live)return saved; // Restoring a deleted channel: restore its archived content.
+      return {
+        ...saved,
+        ...live,
+        title: saved.id===entry.noteTitleScope ? saved.title : live.title,
+        html:live.html,
+        scratch:typeof live.scratch==='string'?live.scratch:''
+      };
+    });
+    walk(c.children||[]);
+  });
+  walk(restored);
+  g.categories=restored;
+  const findNoteLocation=(noteId)=>{
+    const search=nodes=>{
+      for(const c of nodes){const i=(c.notes||[]).findIndex(n=>n.id===noteId);if(i>=0)return {cat:c.id,idx:i};const match=search(c.children||[]);if(match)return match;}
+      return null;
+    };return search(restored);
+  };
+  // Keep the user's current selected channel if it exists in the new tree.
+  const liveSelection=currentNote()?.id;
+  const loc=findNoteLocation(liveSelection)||findNoteLocation(entry.noteId);
+  if(loc){data.activeCategoryId=loc.cat;data.activeNoteIndex=loc.idx;}
+  else{data.activeCategoryId=restored[0]?.id||null;data.activeNoteIndex=0;}
+  if(entry.noteTitleScope){
+    const renamed=allLocalNotes().get(entry.noteTitleScope);
+    if(renamed)rebaseMemoHistoryTitle(entry.noteTitleScope,renamed.title);
+  }
+  save();closeAllMenus();renderAll();loadNote();
+}
+function travelCategoryHistory(direction){
+  const genreId=categoryHistoryGenreId();const all=readCategoryHistory();const stacks=all[genreId]||{undo:[],redo:[]};
+  const from=direction==='undo'?'undo':'redo',to=direction==='undo'?'redo':'undo';
+  if(!stacks[from].length){openInfoModal(direction==='undo'?'戻せる操作がありません。':'やり直せる操作がありません。',direction==='undo'?'操作を戻す':'操作をやり直す');return;}
+  const target=stacks[from][stacks[from].length-1];
   try{
-    const stack=JSON.parse(localStorage.getItem(CATEGORY_UNDO_KEY)||"[]");
-    if(!stack.length){openInfoModal("戻せる操作がありません。","操作を戻す");return}
-    data=stack.pop();
-    localStorage.setItem(CATEGORY_UNDO_KEY,JSON.stringify(stack));
-    save();closeAllMenus();renderAll();loadNote();
-  }catch(e){openInfoModal("操作を戻せませんでした。","操作を戻す")}
+    saveCurrent();
+    const reverse=captureCategoryHistory(null,{noteTitleScope:target.noteTitleScope});
+    // Apply before committing the stack move so failures keep prior history intact.
+    applyCategoryHistory(target);
+    stacks[from].pop();stacks[to].push(reverse);
+    if(stacks[to].length>CATEGORY_HISTORY_LIMIT)stacks[to].shift();
+    all[genreId]=stacks;writeCategoryHistory(all);
+  }catch(e){openInfoModal('操作履歴の復元に失敗したため、変更を中止しました。','履歴を復元できません')}
 }
+function undoCategoryOperation(){travelCategoryHistory('undo')}
+function redoCategoryOperation(){travelCategoryHistory('redo')}
 function renameCategory2(id){
   const c=findCategory(id);if(!c)return;
   const back=document.getElementById("categoryEditBack");
@@ -1489,6 +1589,7 @@ function deleteCategory(id){
   openConfirmModal(effect,()=>{
     // Find the current node again: the tree may have changed while a dialog was open.
     const fresh=findCategoryInfo(categoryId);if(!fresh){openInfoModal('削除対象のカテゴリーが見つかりません。','削除を中止しました');return}
+    saveCurrent();
     const backup=structuredClone(currentGenre().categories);
     const notesBefore=snapshotCategoryNotes();
     let previous;
@@ -1621,7 +1722,7 @@ function saveChannelRename(){
   const c=findCategory(pendingChannelRename.categoryId);
   const n=c?.notes.find(x=>x.id===pendingChannelRename.noteId);
   if(!n){closeChannelRename();openInfoModal('チャンネルが見つかりません。','変更を中止しました');return}
-  saveCurrent();n.title=value;save();closeChannelRename();renderCategories();loadNote();
+  saveCurrent();pushCategoryUndo({noteTitleScope:n.id});n.title=value;rebaseMemoHistoryTitle(n.id,value);save();closeChannelRename();renderCategories();loadNote();
 }
 document.getElementById('channelRenameCancel').onclick=closeChannelRename;
 document.getElementById('channelRenameSave').onclick=saveChannelRename;
@@ -1661,7 +1762,7 @@ function makeMediaResizable(wrap,media){
   handle.addEventListener("mousedown",e=>{
     e.preventDefault();e.stopPropagation();resizing=true;startX=e.clientX;startW=media.getBoundingClientRect().width;
     const move=ev=>{if(!resizing)return;const nw=Math.max(80,Math.min(1000,startW+ev.clientX-startX));media.style.width=nw+"px";media.style.height="auto"};
-    const up=()=>{if(!resizing)return;resizing=false;document.removeEventListener("mousemove",move);document.removeEventListener("mouseup",up);saveCurrent()};
+    const up=()=>{if(!resizing)return;resizing=false;document.removeEventListener("mousemove",move);document.removeEventListener("mouseup",up);saveCurrent();recordMemoEdit('media-resize')};
     document.addEventListener("mousemove",move);document.addEventListener("mouseup",up);
   });
 }
@@ -1696,7 +1797,7 @@ function insertMediaFile(file){
       ? `<video src="${reader.result}" controls style="width:480px;max-width:100%"></video><p></p>`
       : `<img src="${reader.result}" style="width:480px;max-width:100%" alt=""><p></p>`;
     document.execCommand("insertHTML",false,html);
-    enhanceMedia();saveCurrent();
+    enhanceMedia();saveCurrent();recordMemoEdit('media');
   };
   reader.readAsDataURL(file);
 }
@@ -1727,6 +1828,129 @@ document.getElementById("noteTitle").oninput=()=>{
 };
 document.getElementById("editor").oninput=()=>{enhanceMedia();saveCurrent()};
 document.getElementById("editor").onblur=()=>{saveCurrent();enhanceHashtagLinks()};
+/* TEST v6.12.0: custom per-channel formatted memo history.
+   Category history never mutates these stacks. Scratch textarea keeps the
+   browser's native undo; it is intentionally separate from this toolbar. */
+const MEMO_HISTORY_LIMIT=90;
+const memoHistories=new Map();
+let memoActionKind=null;
+let memoRestoring=false;
+function memoEditSnapshot(){
+  const note=currentNote();if(!note)return null;
+  return {title:document.getElementById('noteTitle').value,html:plainEditorHtml()};
+}
+function memoHistoryForCurrent(){
+  const note=currentNote();if(!note)return null;
+  if(!note.id)note.id=crypto.randomUUID();
+  let h=memoHistories.get(note.id);
+  if(!h){h={current:{title:note.title||'',html:note.html||''},undo:[],redo:[],lastKind:null,lastAt:0};memoHistories.set(note.id,h);}
+  return h;
+}
+function updateMemoHistoryButtons(){
+  const h=memoHistoryForCurrent();
+  document.getElementById('memoUndoBtn').disabled=!(h?.undo.length);
+  document.getElementById('memoRedoBtn').disabled=!(h?.redo.length);
+}
+function recordMemoEdit(kind='body'){
+  if(memoRestoring)return;
+  const h=memoHistoryForCurrent(),next=memoEditSnapshot();
+  if(!h||!next)return;
+  if(h.current.html===next.html&&h.current.title===next.title)return;
+  const now=Date.now();
+  const group=kind==='body'||kind==='title';
+  const together=group && h.lastKind===kind && now-h.lastAt<850 && h.undo.length>0 && h.redo.length===0;
+  if(!together){h.undo.push(structuredClone(h.current));if(h.undo.length>MEMO_HISTORY_LIMIT)h.undo.shift();}
+  h.current=next;h.redo=[];h.lastKind=kind;h.lastAt=now;
+  updateMemoHistoryButtons();
+}
+function rebaseMemoHistoryTitle(noteId,title){
+  const h=memoHistories.get(noteId);if(!h)return;
+  h.current.title=title;
+  for(const entry of h.undo)entry.title=title;
+  for(const entry of h.redo)entry.title=title;
+}
+function memoCaretOffset(){
+  const editor=document.getElementById('editor'),sel=window.getSelection();
+  if(!sel?.rangeCount || !editor.contains(sel.focusNode))return null;
+  try{
+    const r=document.createRange();r.selectNodeContents(editor);r.setEnd(sel.focusNode,sel.focusOffset);
+    return r.toString().length;
+  }catch(e){return null;}
+}
+function restoreMemoCaret(offset){
+  const editor=document.getElementById('editor');editor.focus();
+  const range=document.createRange(),walker=document.createTreeWalker(editor,NodeFilter.SHOW_TEXT);
+  let node=null,remaining=offset ?? Infinity;
+  while((node=walker.nextNode())){
+    if(remaining<=node.textContent.length){
+      range.setStart(node,remaining);range.collapse(true);
+      const sel=window.getSelection();sel.removeAllRanges();sel.addRange(range);return;
+    }
+    remaining-=node.textContent.length;
+  }
+  range.selectNodeContents(editor);range.collapse(false);
+  const sel=window.getSelection();sel.removeAllRanges();sel.addRange(range);
+}
+function resetMemoHistoryForNote(noteId){
+  if(noteId)memoHistories.delete(noteId);
+  updateMemoHistoryButtons();
+}
+function travelMemoHistory(direction){
+  const n=currentNote(),h=memoHistoryForCurrent();if(!n||!h)return;
+  const from=direction==='undo'?h.undo:h.redo, to=direction==='undo'?h.redo:h.undo;
+  if(!from.length){updateMemoHistoryButtons();return;}
+  const focused=document.activeElement?.id;
+  const caret=focused==='editor'?memoCaretOffset():null;
+  const titleCaret=focused==='noteTitle'?document.getElementById('noteTitle').selectionStart:null;
+  memoRestoring=true;
+  try{
+    const prior=from.pop();
+    to.push(structuredClone(h.current));if(to.length>MEMO_HISTORY_LIMIT)to.shift();
+    h.current=structuredClone(prior);h.lastKind=null;h.lastAt=0;
+    n.title=prior.title;n.html=prior.html;
+    save();loadNote();renderCategories();
+    if(focused==='editor'){
+      restoreMemoCaret(caret);
+    }else if(focused==='noteTitle'){
+      const field=document.getElementById('noteTitle');field.focus();
+      const at=Math.max(0,Math.min(field.value.length,titleCaret??field.value.length));
+      field.setSelectionRange(at,at);
+    }
+  }finally{memoRestoring=false;updateMemoHistoryButtons();}
+}
+function undoMemoEdit(){travelMemoHistory('undo')}
+function redoMemoEdit(){travelMemoHistory('redo')}
+// Update the current baseline on channel switch without clearing per-channel history.
+const _historyLoadNote=loadNote;
+loadNote=function(){_historyLoadNote();updateMemoHistoryButtons();};
+// Group consecutive text input, but keep decorations as separate history steps.
+const _historyBodyInput=document.getElementById('editor').oninput;
+document.getElementById('editor').oninput=e=>{
+  _historyBodyInput?.(e);
+  recordMemoEdit(memoActionKind||'body');
+};
+const _historyTitleInput=document.getElementById('noteTitle').oninput;
+document.getElementById('noteTitle').oninput=e=>{
+  _historyTitleInput?.(e);
+  recordMemoEdit('title');
+};
+const _historyCmd=cmd;
+cmd=function(name,value=null){
+  memoActionKind='format';
+  try{_historyCmd(name,value);}finally{memoActionKind=null;}
+  recordMemoEdit('format');
+};
+document.getElementById('memoUndoBtn').addEventListener('click',e=>{e.preventDefault();undoMemoEdit()});
+document.getElementById('memoRedoBtn').addEventListener('click',e=>{e.preventDefault();redoMemoEdit()});
+document.addEventListener('keydown',e=>{
+  if(!(e.ctrlKey||e.metaKey)||e.altKey)return;
+  const focused=document.activeElement;
+  if(!focused || !['editor','noteTitle'].includes(focused.id))return;
+  const key=e.key.toLowerCase();
+  if(key==='z'&&!e.shiftKey){e.preventDefault();undoMemoEdit();}
+  else if(key==='y'||(key==='z'&&e.shiftKey)){e.preventDefault();redoMemoEdit();}
+},true);
+
 document.getElementById("editor").onclick=e=>{
   const link=e.target.closest(".memo-channel-link");
   if(!link)return;
@@ -1760,6 +1984,9 @@ document.getElementById("genreAddCategoryBtn").onclick=e=>{
 };
 document.getElementById("genreUndoBtn").onclick=e=>{
   e.preventDefault();e.stopPropagation();undoCategoryOperation();closeGenreSettings();
+};
+document.getElementById("genreRedoBtn").onclick=e=>{
+  e.preventDefault();e.stopPropagation();redoCategoryOperation();closeGenreSettings();
 };
 
 let renameGenreIndex=null;
@@ -1798,7 +2025,7 @@ document.addEventListener("click",e=>{
 });
 document.addEventListener("keydown",e=>{
   if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="s"){e.preventDefault();saveCurrent()}
-  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="n"){e.preventDefault();currentGenre().categories[0].notes.push({title:"新しいメモ",html:"<p></p>"});data.active=[0,currentGenre().categories[0].notes.length-1];save();renderCategories();loadNote()}
+  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="n"){e.preventDefault();openCreateNameModal("channel","root",currentCat()?.id)}
 });
 document.getElementById("modalBack").addEventListener("click",e=>{if(e.target.id==="modalBack")closeModal()});
 const themeBack=document.getElementById("themeBack");
@@ -1971,11 +2198,15 @@ async function startShared(announce){
   sharedVersions=new Map([...rows].map(([id,r])=>[id,r.version]));
   sharedBase=new Map([...rows].map(([id,r])=>[id,JSON.stringify(r.payload)]));
   sharedDirty.clear();sharedConflict.clear();
+  // Preserve category undo stacks after reload only when the local tree and
+  // authenticated cloud tree are identical. Never replay outdated history.
+  const sameSavedTree=JSON.stringify(structureSnapshot())===JSON.stringify(rows.get('structure').payload);
+  memoHistories.clear();if(!sameSavedTree)clearCategoryHistories();
   mergeStructure(rows.get('structure').payload);
   for(const [id,n] of allLocalNotes()){
    const r=rows.get('note:'+id);if(r)Object.assign(n,r.payload);
   }
-  updateSharedBaseline();localSaveOnly();renderAll();loadNote();
+  updateSharedBaseline();localSaveOnly();renderAll();loadNote();updateMemoHistoryButtons();
   showSharedStatus('共有メモ同期済み');
   unlockMemo();
   if(sharedPoll)clearInterval(sharedPoll);
@@ -2058,14 +2289,14 @@ async function pollShared(){
  const remoteStructure=rows.get('structure');
  if(remoteStructure&&remoteStructure.version!==sharedVersions.get('structure')){
   if(sharedDirty.has('structure')){sharedConflict.add('structure')}
-  else{mergeStructure(remoteStructure.payload);sharedVersions.set('structure',remoteStructure.version);sharedBase.set('structure',JSON.stringify(remoteStructure.payload));structureChanged=true;changed=true}
+  else{clearCategoryHistories();mergeStructure(remoteStructure.payload);sharedVersions.set('structure',remoteStructure.version);sharedBase.set('structure',JSON.stringify(remoteStructure.payload));structureChanged=true;changed=true}
  }
  const notes=allLocalNotes();
  for(const [id,n] of notes){
   const key='note:'+id,r=rows.get(key);if(!r)continue;
   if(r.version===sharedVersions.get(key))continue;
   if(sharedDirty.has(key)){sharedConflict.add(key);continue}
-  Object.assign(n,r.payload);sharedVersions.set(key,r.version);sharedBase.set(key,JSON.stringify(r.payload));changed=true;
+  memoHistories.delete(id);Object.assign(n,r.payload);sharedVersions.set(key,r.version);sharedBase.set(key,JSON.stringify(r.payload));changed=true;
  }
  if(changed){updateSharedBaseline();localSaveOnly();if(document.activeElement!==document.getElementById("editor")&&document.activeElement!==document.getElementById("noteTitle")&&document.activeElement!==document.getElementById("scratchText")){renderAll();loadNote()}}
  if(sharedConflict.size)showSharedStatus('競合あり：別端末でも編集されています');
@@ -2313,7 +2544,7 @@ normalizeCategories(currentGenre().categories);if(!data.activeCategoryId)data.ac
   // Composer actions.
   const composerInput=$('#composerInput');
   function focusEditorEnd(){ const ed=$('#editor'); ed.focus(); const range=document.createRange(); range.selectNodeContents(ed); range.collapse(false); const sel=window.getSelection(); sel.removeAllRanges(); sel.addRange(range); }
-  function insertTextFromComposer(){ const v=composerInput.value.trim(); if(!v) return; focusEditorEnd(); document.execCommand('insertHTML',false,`<p>${v.replace(/[&<>]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]))}</p>`); composerInput.value=''; enhanceMedia(); saveCurrent(); }
+  function insertTextFromComposer(){ const v=composerInput.value.trim(); if(!v) return; focusEditorEnd(); document.execCommand('insertHTML',false,`<p>${v.replace(/[&<>]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]))}</p>`); composerInput.value=''; enhanceMedia(); saveCurrent(); recordMemoEdit('insert'); }
   composerInput.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); insertTextFromComposer(); closeComposerMenus(); } });
   $('#composerPlusBtn').addEventListener('click',()=>{ const m=$('#composerAttachMenu'); const show=!m.classList.contains('show'); closeComposerMenus(); if(show)m.classList.add('show'); });
   $('#composerAddImage').addEventListener('click',()=>{ closeComposerMenus(); $('#imageInput').click(); });
@@ -2477,7 +2708,7 @@ normalizeCategories(currentGenre().categories);if(!data.activeCategoryId)data.ac
 /* v6.5: PWA update detection + user-initiated safe refresh. */
 (function(){
  'use strict';
- const INSTALLED_BUILD='6.11.1';
+ const INSTALLED_BUILD='6.12.0';
  const intervalMs=10*60*1000;
  const status=document.getElementById('appUpdateStatus');
  const buildLabel=document.getElementById('appBuildLabel');
