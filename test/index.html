@@ -562,12 +562,44 @@ body[data-theme="dark"] .create-name-modal .create-name-error{color:#ff9499}
   .app>.main>.memo-workspace>.scratch-panel .scratch-content{padding:14px 15px calc(22px + env(safe-area-inset-bottom))}
   .app>.main>.memo-workspace>.memo-column>.editor-wrap{padding-top:14px}
 }
-/* TEST v6.12.0: independent memo edit history buttons. */
+/* TEST v6.13.0: independent memo edit history buttons. */
 .memo-history-btn{min-width:35px;font-family:Arial,sans-serif!important;font-size:23px!important;font-weight:650;line-height:1!important;padding:4px 7px!important}
 .memo-history-btn:disabled{opacity:.38;cursor:not-allowed!important}
 .memo-history-btn:not(:disabled):hover{background:var(--hover)!important}
 .memo-history-divider{align-self:stretch;width:1px;min-height:23px;background:var(--line);margin:2px 2px}
 @media(max-width:800px){#memoUndoBtn,#memoRedoBtn,.memo-history-divider{display:none!important}}
+
+/* TEST v6.13.0: mirrored, icon-only Undo/Redo and phone-safe hierarchy chooser. */
+.history-arrow{display:block;width:20px;height:20px;flex:0 0 auto;pointer-events:none}
+.history-action-btn{display:inline-flex;align-items:center;justify-content:center;flex:0 0 32px;width:32px;height:32px;padding:4px;border:1px solid transparent;border-radius:7px;background:transparent;color:var(--text);cursor:pointer}
+.history-action-btn:hover:not(:disabled){background:var(--hover);border-color:var(--line)}
+.history-action-btn:disabled{opacity:.34;cursor:default}
+.history-action-btn:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.sidebar-head{gap:3px}
+.sidebar-title{flex:1 1 auto;min-width:0}
+.sidebar-history-actions{display:flex;align-items:center;gap:1px;flex:0 0 auto}
+.sidebar-head #genreMenuBtn{flex:0 0 auto}
+.toolbar .memo-history-btn{display:inline-flex;align-items:center;justify-content:center;min-width:35px;min-height:32px;padding:4px 6px!important}
+.memo-history-btn .history-arrow{width:20px;height:20px}
+.scratch-header-title{flex:1 1 auto}
+.scratch-history-actions{display:flex;align-items:center;gap:2px;flex:0 0 auto}
+.scratch-header .history-action-btn{width:32px;height:32px}
+@media(max-width:800px){
+  /* Center submenu as an app-owned choice dialog, independent of the opener x position. */
+  #categoryHierarchyMenu.show{
+    position:fixed;left:50%!important;top:50%!important;transform:translate(-50%,-50%);
+    width:min(330px,calc(100vw - 30px));max-width:calc(100vw - 30px);
+    max-height:calc(var(--memo-mobile-viewport,100dvh) - 32px);
+    z-index:95;padding:12px;border-radius:12px;
+    box-shadow:0 0 0 100vmax #241b1766,0 15px 35px #0005;
+  }
+  #categoryHierarchyMenu button{display:block;width:100%;max-width:100%;min-height:46px;white-space:normal;text-align:left;font-size:14px}
+  .sidebar-history-actions{gap:0}
+  .sidebar-head .history-action-btn{width:29px;flex-basis:29px;height:32px}
+  .sidebar-head .history-arrow{width:19px;height:19px}
+  .sidebar-head #genreMenuBtn{padding:4px 3px}
+  .scratch-header .history-action-btn{width:31px;height:34px;flex-basis:31px}
+}
 </style>
 </head>
 <body>
@@ -604,6 +636,10 @@ body[data-theme="dark"] .create-name-modal .create-name-error{color:#ff9499}
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-head">
       <div class="sidebar-title" id="genreTitle">スト6メモ</div>
+      <div class="sidebar-history-actions" role="group" aria-label="カテゴリー・チャンネルの操作履歴">
+        <button type="button" class="history-action-btn" id="genreUndoBtn" aria-label="カテゴリー・チャンネルの操作を戻す" title="カテゴリー・チャンネルの操作を戻す" disabled><svg class="history-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6 4 11l5 5 M4 11h10c8 0 8 10 0 10h-2"/></svg></button>
+        <button type="button" class="history-action-btn" id="genreRedoBtn" aria-label="カテゴリー・チャンネルの操作をやり直す" title="カテゴリー・チャンネルの操作をやり直す" disabled><svg class="history-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><g transform="translate(24 0) scale(-1 1)"><path d="M9 6 4 11l5 5 M4 11h10c8 0 8 10 0 10h-2"/></g></svg></button>
+      </div>
       <button class="icon-btn menu-compact" id="genreMenuBtn" title="メモ設定">…</button>
     </div>
     <div class="sidebar-body" id="categories"></div>
@@ -623,8 +659,8 @@ body[data-theme="dark"] .create-name-modal .create-name-error{color:#ff9499}
       <div class="toolbar-shell" id="toolbarShell">
         <button type="button" id="toolbarToggle" class="toolbar-toggle" aria-controls="editToolbar" aria-expanded="false"><span>✎ 編集ツール</span><span id="toolbarChevron">▾</span></button>
         <div class="toolbar is-folded" id="editToolbar">
-          <button type="button" class="memo-history-btn" id="memoUndoBtn" title="メモ本文の操作を戻す（Ctrl+Z）" aria-label="メモ本文の操作を戻す" disabled>↶</button>
-          <button type="button" class="memo-history-btn" id="memoRedoBtn" title="メモ本文の操作をやり直す（Ctrl+Y）" aria-label="メモ本文の操作をやり直す" disabled>↷</button>
+          <button type="button" class="memo-history-btn" id="memoUndoBtn" title="メモ本文の操作を戻す（Ctrl+Z）" aria-label="メモ本文の操作を戻す" disabled><svg class="history-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6 4 11l5 5 M4 11h10c8 0 8 10 0 10h-2"/></svg></button>
+          <button type="button" class="memo-history-btn" id="memoRedoBtn" title="メモ本文の操作をやり直す（Ctrl+Y）" aria-label="メモ本文の操作をやり直す" disabled><svg class="history-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><g transform="translate(24 0) scale(-1 1)"><path d="M9 6 4 11l5 5 M4 11h10c8 0 8 10 0 10h-2"/></g></svg></button>
           <span class="memo-history-divider" aria-hidden="true"></span>
           <button type="button" data-cmd="bold" title="太字"><b>B</b></button>
           <button type="button" data-cmd="italic" title="斜体"><i>I</i></button>
@@ -674,6 +710,10 @@ body[data-theme="dark"] .create-name-modal .create-name-error{color:#ff9499}
         <div class="scratch-header">
           <button type="button" class="scratch-mobile-menu" id="scratchCategoryBtn" aria-label="カテゴリー一覧へ移動" title="カテゴリー一覧へ移動">☰</button>
           <div class="scratch-header-title"><strong>雑メモ</strong><span id="scratchChannelTitle"></span></div>
+          <div class="scratch-history-actions" role="group" aria-label="雑メモの編集履歴">
+            <button type="button" class="history-action-btn" id="scratchUndoBtn" aria-label="雑メモの操作を戻す" title="雑メモの操作を戻す" disabled><svg class="history-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6 4 11l5 5 M4 11h10c8 0 8 10 0 10h-2"/></svg></button>
+            <button type="button" class="history-action-btn" id="scratchRedoBtn" aria-label="雑メモの操作をやり直す" title="雑メモの操作をやり直す" disabled><svg class="history-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><g transform="translate(24 0) scale(-1 1)"><path d="M9 6 4 11l5 5 M4 11h10c8 0 8 10 0 10h-2"/></g></svg></button>
+          </div>
         </div>
         <div class="scratch-content" id="scratchContent">
           <textarea id="scratchText" class="scratch-text" spellcheck="false" placeholder="ここに思いついたことを書いてください…" aria-label="雑メモ"></textarea>
@@ -735,7 +775,7 @@ body[data-theme="dark"] .create-name-modal .create-name-error{color:#ff9499}
       <button class="theme-option dark" id="themeDark"><span class="preview"><span class="p-side"></span><span class="p-main"></span></span><strong>ダーク</strong><span>これまでの配色</span></button>
     </div>
     <div class="app-update-settings" aria-live="polite">
-      <div class="app-update-heading"><strong>アプリの更新</strong><span id="appBuildLabel">v6.12.0</span></div>
+      <div class="app-update-heading"><strong>アプリの更新</strong><span id="appBuildLabel">v6.13.0</span></div>
       <p id="appUpdateStatus">更新情報を確認しています…</p>
       <div class="app-update-actions">
         <button type="button" id="appCheckUpdate">更新を確認</button>
@@ -831,8 +871,6 @@ body[data-theme="dark"] .create-name-modal .create-name-error{color:#ff9499}
 <div class="context-menu" id="genreSettingsMenu">
   <button id="genreRenameFromSettingsBtn">メモ名を編集</button>
   <button id="genreAddCategoryBtn">カテゴリーを追加</button>
-  <button id="genreUndoBtn" title="カテゴリーとチャンネルの操作を戻す">操作を戻す</button>
-  <button id="genreRedoBtn" title="カテゴリーとチャンネルの操作をやり直す">操作をやり直す</button>
 </div>
 
 
@@ -1090,14 +1128,16 @@ function renderCategories(){
     wrap.appendChild(head);
     if(cat.open){
       const inner=document.createElement("div");inner.className="cat-children";
-      cat.children.forEach(ch=>inner.appendChild(renderCat(ch)));
       const notes=document.createElement("div");notes.className="notes";
       cat.notes.forEach((n,ni)=>{const el=document.createElement("div");el.className="note"+(cat.id===data.activeCategoryId&&ni===data.activeNoteIndex?" active":"");el.innerHTML=`<span class="hash">#</span><span style="overflow:hidden;text-overflow:ellipsis">${esc(n.title)}</span>`;el.onclick=()=>{saveCurrent();data.activeCategoryId=cat.id;data.activeNoteIndex=ni;data.active=[0,0];save();loadNote();renderCategories()};el.ondblclick=e=>{e.stopPropagation();openNoteMenu(e.clientX,e.clientY,cat.id,ni)};el.draggable=true;el.ondragstart=e=>{dragNote={cat:cat.id,ni};el.classList.add("dragging")};el.ondragover=e=>{if(dragNote&&dragNote.cat===cat.id){e.preventDefault();el.classList.add("drop-target")}};el.ondragleave=()=>el.classList.remove("drop-target");el.ondrop=e=>{e.preventDefault();el.classList.remove("drop-target");if(dragNote&&dragNote.cat===cat.id)moveNoteById(cat.id,dragNote.ni,ni)};el.ondragend=()=>{dragNote=null;document.querySelectorAll(".note").forEach(x=>x.classList.remove("dragging","drop-target"))};notes.appendChild(el)});
-      inner.appendChild(notes);wrap.appendChild(inner);
+      inner.appendChild(notes);
+      cat.children.forEach(ch=>inner.appendChild(renderCat(ch)));
+      wrap.appendChild(inner);
     }
     return wrap;
   }
   g.categories.forEach(c=>box.appendChild(renderCat(c)));
+  updateCategoryHistoryButtons();
 }
 function allChannels(){
   const out=[];
@@ -1414,7 +1454,7 @@ document.getElementById('createNameInput').addEventListener('keydown',e=>{
   if(e.key==='Enter'){e.preventDefault();confirmCreateName();}
   else if(e.key==='Escape'){e.preventDefault();closeCreateNameModal();}
 });
-/* TEST v6.12.0: category/channel undo and redo have their own stacks,
+/* TEST v6.13.0: category/channel undo and redo have their own stacks,
    independent of memo body/title/scratch edits and of other memo groups. */
 const CATEGORY_UNDO_KEY=KEY+'_categoryHistoryV2';
 const CATEGORY_HISTORY_LIMIT=25;
@@ -1425,7 +1465,7 @@ function readCategoryHistory(){
   }catch(e){return {}}
 }
 function writeCategoryHistory(all){
-  try{localStorage.setItem(CATEGORY_UNDO_KEY,JSON.stringify(all));return true}
+  try{localStorage.setItem(CATEGORY_UNDO_KEY,JSON.stringify(all));updateCategoryHistoryButtons();return true}
   catch(e){openInfoModal('操作履歴を端末に保存できませんでした。ストレージの空き容量を確認してください。','履歴の保存に失敗');return false}
 }
 function clearCategoryHistories(){
@@ -1434,6 +1474,15 @@ function clearCategoryHistories(){
 function categoryHistoryGenreId(){
   const g=currentGenre();if(g&&!g.id)g.id=crypto.randomUUID();return g?.id||null;
 }
+function updateCategoryHistoryButtons(){
+  const undo=document.getElementById('genreUndoBtn'),redo=document.getElementById('genreRedoBtn');
+  if(!undo||!redo)return;
+  const genreId=categoryHistoryGenreId();
+  const h=readCategoryHistory()[genreId]||{undo:[],redo:[]};
+  undo.disabled=!h.undo?.length;
+  redo.disabled=!h.redo?.length;
+}
+
 function captureCategoryHistory(categoriesBefore=null,options={}){
   const cat=currentCat(), note=currentNote();
   return {
@@ -1744,7 +1793,17 @@ document.getElementById("catRenameBtn").onclick=()=>{renameCategory2(menuCatInde
 document.getElementById("catHierarchyBtn").onclick=e=>{
   e.preventDefault();e.stopPropagation();
   const m=document.getElementById("categoryHierarchyMenu"),r=document.getElementById("catMenu").getBoundingClientRect();
-  m.style.left=(r.right+6)+"px";m.style.top=r.top+"px";m.classList.add("show");
+  m.classList.add("show");
+  if(window.matchMedia('(max-width:800px)').matches){
+    // Mobile: CSS centers a dedicated, viewport-bound choice surface.
+    m.style.removeProperty('left');m.style.removeProperty('top');
+    document.getElementById('catMenu').classList.remove('show');
+  }else{
+    const pad=10, width=m.offsetWidth, height=m.offsetHeight;
+    const left=r.right+6+width+pad<=innerWidth ? r.right+6 : r.left-width-6;
+    m.style.left=Math.max(pad,Math.min(left,innerWidth-width-pad))+"px";
+    m.style.top=Math.max(pad,Math.min(r.top,innerHeight-height-pad))+"px";
+  }
 };
 document.getElementById("addParentCategoryBtn").onclick=e=>{e.preventDefault();e.stopPropagation();addParentCategory()};
 document.getElementById("addChildCategoryBtn").onclick=e=>{e.preventDefault();e.stopPropagation();addChildCategory()};
@@ -1828,7 +1887,7 @@ document.getElementById("noteTitle").oninput=()=>{
 };
 document.getElementById("editor").oninput=()=>{enhanceMedia();saveCurrent()};
 document.getElementById("editor").onblur=()=>{saveCurrent();enhanceHashtagLinks()};
-/* TEST v6.12.0: custom per-channel formatted memo history.
+/* TEST v6.13.0: custom per-channel formatted memo history.
    Category history never mutates these stacks. Scratch textarea keeps the
    browser's native undo; it is intentionally separate from this toolbar. */
 const MEMO_HISTORY_LIMIT=90;
@@ -2708,7 +2767,7 @@ normalizeCategories(currentGenre().categories);if(!data.activeCategoryId)data.ac
 /* v6.5: PWA update detection + user-initiated safe refresh. */
 (function(){
  'use strict';
- const INSTALLED_BUILD='6.12.0';
+ const INSTALLED_BUILD='6.13.0';
  const intervalMs=10*60*1000;
  const status=document.getElementById('appUpdateStatus');
  const buildLabel=document.getElementById('appBuildLabel');
@@ -2887,6 +2946,89 @@ normalizeCategories(currentGenre().categories);if(!data.activeCategoryId)data.ac
   updateMobileLayout();
 })();
 
+
+/* TEST v6.13.0: isolated, per-channel scratchpad edit history.
+   Does not touch the category or formatted-memo history. */
+const SCRATCH_HISTORY_LIMIT=90;
+const scratchHistories=new Map();
+let scratchRestoring=false;
+function scratchHistoryForCurrent(){
+  const n=currentNote();if(!n)return null;
+  if(!n.id)n.id=crypto.randomUUID();
+  let h=scratchHistories.get(n.id);
+  if(!h){h={current:typeof n.scratch==='string'?n.scratch:'',undo:[],redo:[],lastAt:0};scratchHistories.set(n.id,h);}
+  return h;
+}
+function updateScratchHistoryButtons(){
+  const h=scratchHistoryForCurrent();
+  document.getElementById('scratchUndoBtn').disabled=!(h?.undo.length);
+  document.getElementById('scratchRedoBtn').disabled=!(h?.redo.length);
+}
+function alignScratchHistory(){
+  const n=currentNote(),h=scratchHistoryForCurrent();
+  // A remote change or a restored deleted channel is a new baseline.
+  if(h && h.current!==(typeof n.scratch==='string'?n.scratch:'')){
+    h.current=typeof n.scratch==='string'?n.scratch:'';h.undo=[];h.redo=[];h.lastAt=0;
+  }
+  updateScratchHistoryButtons();
+}
+function recordScratchEdit(){
+  if(scratchRestoring)return;
+  const n=currentNote(),h=scratchHistoryForCurrent();
+  const field=document.getElementById('scratchText');
+  if(!n||!h||field.dataset.noteId!==n.id)return;
+  const next=field.value;if(h.current===next)return;
+  const now=Date.now();
+  // Group typing bursts; explicit Undo/Redo always produce one history step.
+  if(now-h.lastAt>850||!h.undo.length||h.redo.length){
+    h.undo.push(h.current);
+    if(h.undo.length>SCRATCH_HISTORY_LIMIT)h.undo.shift();
+  }
+  h.current=next;h.redo=[];h.lastAt=now;
+  updateScratchHistoryButtons();
+}
+function travelScratchHistory(direction){
+  const n=currentNote(),h=scratchHistoryForCurrent();if(!n||!h)return;
+  const src=direction==='undo'?h.undo:h.redo;
+  const dest=direction==='undo'?h.redo:h.undo;
+  if(!src.length){updateScratchHistoryButtons();return;}
+  const field=document.getElementById('scratchText');
+  if(field.dataset.noteId!==n.id)return;
+  const hadFocus=document.activeElement===field;
+  const previousCaret=hadFocus?field.selectionStart:null;
+  scratchRestoring=true;
+  try{
+    const value=src.pop();dest.push(h.current);
+    if(dest.length>SCRATCH_HISTORY_LIMIT)dest.shift();
+    h.current=value;h.lastAt=0;
+    field.value=value;n.scratch=value;save();
+    if(hadFocus){
+      field.focus();const at=Math.min(previousCaret??value.length,value.length);
+      field.setSelectionRange(at,at);
+    }
+  }finally{scratchRestoring=false;updateScratchHistoryButtons();}
+}
+function undoScratchEdit(){travelScratchHistory('undo')}
+function redoScratchEdit(){travelScratchHistory('redo')}
+const _scratchHistoryLoadNote=loadNote;
+loadNote=function(){_scratchHistoryLoadNote();alignScratchHistory();};
+const scratchHistoryField=document.getElementById('scratchText');
+scratchHistoryField.addEventListener('focus',()=>{scratchHistoryForCurrent();updateScratchHistoryButtons();});
+scratchHistoryField.addEventListener('beforeinput',e=>{
+  scratchHistoryForCurrent();
+  if(e.inputType==='historyUndo'){e.preventDefault();undoScratchEdit();}
+  else if(e.inputType==='historyRedo'){e.preventDefault();redoScratchEdit();}
+});
+scratchHistoryField.addEventListener('input',recordScratchEdit);
+document.getElementById('scratchUndoBtn').addEventListener('click',e=>{e.preventDefault();undoScratchEdit()});
+document.getElementById('scratchRedoBtn').addEventListener('click',e=>{e.preventDefault();redoScratchEdit()});
+document.addEventListener('keydown',e=>{
+  if(!(e.ctrlKey||e.metaKey)||e.altKey||document.activeElement!==scratchHistoryField)return;
+  const key=e.key.toLowerCase();
+  if(key==='z'&&!e.shiftKey){e.preventDefault();undoScratchEdit();}
+  else if(key==='y'||(key==='z'&&e.shiftKey)){e.preventDefault();redoScratchEdit();}
+},true);
+alignScratchHistory();
 </script>
 </body>
 </html>
