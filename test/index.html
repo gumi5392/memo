@@ -562,7 +562,7 @@ body[data-theme="dark"] .create-name-modal .create-name-error{color:#ff9499}
   .app>.main>.memo-workspace>.scratch-panel .scratch-content{padding:14px 15px calc(22px + env(safe-area-inset-bottom))}
   .app>.main>.memo-workspace>.memo-column>.editor-wrap{padding-top:14px}
 }
-/* TEST v6.14.0: independent memo edit history buttons. */
+/* TEST v6.14.1: independent memo edit history buttons. */
 .memo-history-btn{min-width:35px;font-family:Arial,sans-serif!important;font-size:23px!important;font-weight:650;line-height:1!important;padding:4px 7px!important}
 .memo-history-btn:disabled{opacity:.38;cursor:not-allowed!important}
 .memo-history-btn:not(:disabled):hover{background:var(--hover)!important}
@@ -787,7 +787,7 @@ body[data-theme="dark"] .create-name-modal .create-name-error{color:#ff9499}
       <button class="theme-option dark" id="themeDark"><span class="preview"><span class="p-side"></span><span class="p-main"></span></span><strong>ダーク</strong><span>これまでの配色</span></button>
     </div>
     <div class="app-update-settings" aria-live="polite">
-      <div class="app-update-heading"><strong>アプリの更新</strong><span id="appBuildLabel">v6.14.0</span></div>
+      <div class="app-update-heading"><strong>アプリの更新</strong><span id="appBuildLabel">v6.14.1</span></div>
       <p id="appUpdateStatus">更新情報を確認しています…</p>
       <div class="app-update-actions">
         <button type="button" id="appCheckUpdate">更新を確認</button>
@@ -1004,11 +1004,26 @@ let data;
 try{data=JSON.parse(localStorage.getItem(KEY))||structuredClone(defaultData)}catch(e){data=structuredClone(defaultData)}
 let selectedIcon="🎮", pendingImage=null;
 
+// TEST v6.14.1: quota errors must never abort a menu action or a click handler.
+// The UI is updated in memory; v6.14's cloud queue will still be notified.
+// The old backup, if present, is retained but no longer rewritten every edit:
+// repeatedly duplicating the whole notebook unnecessarily exhausted storage.
+let localMemoSaveError=false;
 function save(){
-  // Keep a lightweight backup of the last valid saved state.
-  try{localStorage.setItem(KEY+"_backup",JSON.stringify(data))}catch(e){}
-  localStorage.setItem(KEY,JSON.stringify(data));
-  document.getElementById("saveState").textContent="保存済み "+new Date().toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"});
+  let written=false;
+  try{
+    localStorage.setItem(KEY,JSON.stringify(data));
+    written=true;
+    localMemoSaveError=false;
+  }catch(error){
+    localMemoSaveError=true;
+    console.warn('メモ帳の端末内保存に失敗:',error);
+  }
+  const label=document.getElementById('saveState');
+  if(label)label.textContent=written
+    ?'端末に保存 '+new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})
+    :'端末保存エラー（文章をコピー）';
+  return written;
 }
 function currentGenre(){return data.genres[data.activeGenre]}
 function currentCat(){ensureCategoryState();return findCategory(data.activeCategoryId)}
@@ -2299,7 +2314,7 @@ function markPending(id,payload){
 }
 function updateSyncLabel(){
   cloudDirty=sharedDirty.size>0;
-  if(sharedSavingError){showSharedStatus('端末保存エラー：書いた内容を別の場所にコピーしてください');return}
+  if(sharedSavingError||localMemoSaveError){showSharedStatus('端末保存エラー：書いた内容を別の場所にコピーしてください');return}
   if(sharedConflict.size){showSharedStatus('競合 '+sharedConflict.size+'件：タップして内容を確認');return}
   if(!navigator.onLine && sharedDirty.size){showSharedStatus('オフライン：端末に未同期の変更あり');return}
   if(sharedDirty.size){showSharedStatus(sharedBusy?'クラウドへ保存中…':'未同期 '+sharedDirty.size+'件（端末に保存）');return}
@@ -2457,8 +2472,16 @@ async function startShared(announce){
   }catch(e){showSharedStatus('共有メモ接続失敗：'+e.message)}
 }
 function localSaveOnly(){
- try{localStorage.setItem(KEY,JSON.stringify(data))}
- catch(e){sharedSavingError=true;showSharedStatus('端末保存エラー：容量を確認し、文章を別にコピーしてください')}
+  // This is called after receiving cloud data. Storage failure should be
+  // reported, not misclassified as a failure of the pending-draft queue.
+  try{
+    localStorage.setItem(KEY,JSON.stringify(data));
+    localMemoSaveError=false;
+  }catch(error){
+    localMemoSaveError=true;
+    console.warn('同期内容の端末内保存に失敗:',error);
+    showSharedStatus('端末保存エラー：文章を別の場所にコピーしてください');
+  }
 }
 async function initializeShared(){
  // First-device bootstrap ONLY reads the stable table and writes test records.
@@ -2835,7 +2858,8 @@ normalizeCategories(currentGenre().categories);if(!data.activeCategoryId)data.ac
     if(!btn || btn.classList.contains('add') || btn.classList.contains('settings')) return;
     const buttons=$$('#genres .server:not(.add):not(.settings)');
     const i=buttons.indexOf(btn);
-    if(i===data.activeGenre && performance.now()>=mobileGenreSuppressUntil){
+    if(!window.matchMedia('(max-width:800px)').matches &&
+       i===data.activeGenre && performance.now()>=mobileGenreSuppressUntil){
       e.preventDefault(); e.stopImmediatePropagation();
       const r=btn.getBoundingClientRect();
       openContext(r.right+8, Math.max(10,r.top), i);
@@ -2948,6 +2972,12 @@ normalizeCategories(currentGenre().categories);if(!data.activeCategoryId)data.ac
   const closeOpenEditorMenus=()=>{closeFontMenu();closePalette();};
   document.addEventListener('click',e=>{
     const target=e.target;
+    // Modal actions have priority over dismissing a side or editor popup.
+    // Otherwise a stale category menu could consume the green Save/Add click.
+    if(target.closest('.modal-back.show')){
+      closeOpenEditorMenus();
+      return;
+    }
     const menuSelector='.cat-menu.show,.note-menu.show,.context-menu.show';
     const sideOpen=!!$(menuSelector);
     const fontOpen=!fontMenu.hidden;
@@ -3093,7 +3123,7 @@ normalizeCategories(currentGenre().categories);if(!data.activeCategoryId)data.ac
 /* v6.5: PWA update detection + user-initiated safe refresh. */
 (function(){
  'use strict';
- const INSTALLED_BUILD='6.14.0';
+ const INSTALLED_BUILD='6.14.1';
  const intervalMs=10*60*1000;
  const status=document.getElementById('appUpdateStatus');
  const buildLabel=document.getElementById('appBuildLabel');
