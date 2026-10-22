@@ -562,14 +562,14 @@ body[data-theme="dark"] .create-name-modal .create-name-error{color:#ff9499}
   .app>.main>.memo-workspace>.scratch-panel .scratch-content{padding:14px 15px calc(22px + env(safe-area-inset-bottom))}
   .app>.main>.memo-workspace>.memo-column>.editor-wrap{padding-top:14px}
 }
-/* TEST v6.13.0: independent memo edit history buttons. */
+/* TEST v6.14.0: independent memo edit history buttons. */
 .memo-history-btn{min-width:35px;font-family:Arial,sans-serif!important;font-size:23px!important;font-weight:650;line-height:1!important;padding:4px 7px!important}
 .memo-history-btn:disabled{opacity:.38;cursor:not-allowed!important}
 .memo-history-btn:not(:disabled):hover{background:var(--hover)!important}
 .memo-history-divider{align-self:stretch;width:1px;min-height:23px;background:var(--line);margin:2px 2px}
 @media(max-width:800px){#memoUndoBtn,#memoRedoBtn,.memo-history-divider{display:none!important}}
 
-/* TEST v6.13.0: mirrored, icon-only Undo/Redo and phone-safe hierarchy chooser. */
+/* TEST v6.14.0: mirrored, icon-only Undo/Redo and phone-safe hierarchy chooser. */
 .history-arrow{display:block;width:20px;height:20px;flex:0 0 auto;pointer-events:none}
 .history-action-btn{display:inline-flex;align-items:center;justify-content:center;flex:0 0 32px;width:32px;height:32px;padding:4px;border:1px solid transparent;border-radius:7px;background:transparent;color:var(--text);cursor:pointer}
 .history-action-btn:hover:not(:disabled){background:var(--hover);border-color:var(--line)}
@@ -600,6 +600,18 @@ body[data-theme="dark"] .create-name-modal .create-name-error{color:#ff9499}
   .sidebar-head #genreMenuBtn{padding:4px 3px}
   .scratch-header .history-action-btn{width:31px;height:34px;flex-basis:31px}
 }
+
+/* v6.14: sync state and a deliberate, non-destructive conflict dialog */
+#saveState{cursor:pointer}
+#confirmBack.show{z-index:130} /* confirmation must appear ABOVE conflict review */
+.conflict-panel{width:min(760px,calc(100vw - 28px));max-height:calc(100dvh - 26px);overflow:auto}
+.conflict-panel h3{margin:0 0 10px}.conflict-panel p{font-size:13px;line-height:1.6}
+.conflict-panel select{width:100%;max-width:100%;padding:9px;border:1px solid var(--line);border-radius:7px;background:var(--panel2);color:var(--text)}
+.conflict-sides{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:12px 0}
+.conflict-sides label{font-size:13px;font-weight:600;min-width:0}
+.conflict-sides textarea{margin-top:7px;width:100%;height:190px;resize:vertical;font-size:12px;line-height:1.5;border:1px solid var(--line);border-radius:7px;padding:10px;color:var(--text);background:var(--panel2)}
+.conflict-warning{color:var(--muted)}.conflict-actions{flex-wrap:wrap}
+@media(max-width:600px){.conflict-sides{grid-template-columns:1fr}.conflict-sides textarea{height:115px}.conflict-panel{padding:14px}}
 </style>
 </head>
 <body>
@@ -775,7 +787,7 @@ body[data-theme="dark"] .create-name-modal .create-name-error{color:#ff9499}
       <button class="theme-option dark" id="themeDark"><span class="preview"><span class="p-side"></span><span class="p-main"></span></span><strong>ダーク</strong><span>これまでの配色</span></button>
     </div>
     <div class="app-update-settings" aria-live="polite">
-      <div class="app-update-heading"><strong>アプリの更新</strong><span id="appBuildLabel">v6.13.0</span></div>
+      <div class="app-update-heading"><strong>アプリの更新</strong><span id="appBuildLabel">v6.14.0</span></div>
       <p id="appUpdateStatus">更新情報を確認しています…</p>
       <div class="app-update-actions">
         <button type="button" id="appCheckUpdate">更新を確認</button>
@@ -844,7 +856,27 @@ body[data-theme="dark"] .create-name-modal .create-name-error{color:#ff9499}
       <button id="syncInit">安定版からテスト版へコピー</button>
       <button id="syncPush">クラウドへ保存</button>
       <button id="syncPull">同期を取得</button>
+      <button id="syncConflictOpen">競合した内容を確認</button>
       <button id="syncLogout">ログアウト</button>
+    </div>
+  </div>
+</div>
+<div class="modal-back" id="syncConflictBack" role="dialog" aria-modal="true" aria-label="同期の競合を確認">
+  <div class="modal conflict-panel">
+    <h3>同期の競合があります</h3>
+    <p>PCとスマホで同じメモが更新されました。文章を勝手に消さないよう、自動上書きを止めています。</p>
+    <label for="syncConflictSelect">確認するデータ</label>
+    <select id="syncConflictSelect"></select>
+    <div class="conflict-sides">
+      <label>この端末の未同期内容<textarea id="syncLocalPreview" readonly spellcheck="false"></textarea></label>
+      <label>クラウドに保存済みの内容<textarea id="syncRemotePreview" readonly spellcheck="false"></textarea></label>
+    </div>
+    <p class="conflict-warning">※ どちらを選んでも、変更前の両方の内容はこの端末内に復旧用として残します。心配な場合は先に「両方をコピー」を押してください。</p>
+    <div class="modal-actions conflict-actions">
+      <button id="syncConflictCopy">両方をコピー</button>
+      <button id="syncConflictUseRemote">クラウド版を採用</button>
+      <button id="syncConflictUseLocal" class="primary">端末版を保存</button>
+      <button id="syncConflictClose">後で確認</button>
     </div>
   </div>
 </div>
@@ -1454,7 +1486,7 @@ document.getElementById('createNameInput').addEventListener('keydown',e=>{
   if(e.key==='Enter'){e.preventDefault();confirmCreateName();}
   else if(e.key==='Escape'){e.preventDefault();closeCreateNameModal();}
 });
-/* TEST v6.13.0: category/channel undo and redo have their own stacks,
+/* TEST v6.14.0: category/channel undo and redo have their own stacks,
    independent of memo body/title/scratch edits and of other memo groups. */
 const CATEGORY_UNDO_KEY=KEY+'_categoryHistoryV2';
 const CATEGORY_HISTORY_LIMIT=25;
@@ -1887,7 +1919,7 @@ document.getElementById("noteTitle").oninput=()=>{
 };
 document.getElementById("editor").oninput=()=>{enhanceMedia();saveCurrent()};
 document.getElementById("editor").onblur=()=>{saveCurrent();enhanceHashtagLinks()};
-/* TEST v6.13.0: custom per-channel formatted memo history.
+/* TEST v6.14.0: custom per-channel formatted memo history.
    Category history never mutates these stacks. Scratch textarea keeps the
    browser's native undo; it is intentionally separate from this toolbar. */
 const MEMO_HISTORY_LIMIT=90;
@@ -2206,178 +2238,472 @@ function structureSnapshot(){
  return {genres:data.genres.map(g=>({id:g.id,name:g.name,icon:g.icon,iconBg:g.iconBg||null,categories:JSON.parse(JSON.stringify(g.categories,(k,v)=>k==='html'||k==='title'||k==='scratch'?undefined:v))}))};
 }
 function noteSnapshot(n){return {title:n.title||'',html:n.html||'',scratch:typeof n.scratch==='string'?n.scratch:''}}
-function updateSharedBaseline(){
- sharedLastStructure=JSON.stringify(structureSnapshot());
- sharedLastNotes=new Map([...allLocalNotes()].map(([id,n])=>[id,JSON.stringify(noteSnapshot(n))]));
+// v6.14: durable drafts, compare-and-swap writes and near-live remote refresh.
+// Each document (structure or note:<uuid>) has its own cloud version.
+const PENDING_PREFIX='chromeMemoTESTPendingV614_';
+const RESCUE_PREFIX='chromeMemoTESTRescueV614_';
+const LEGACY_RESCUE_PREFIX='chromeMemoTESTBeforeV614_';
+const REMOTE_POLL_MS=2500;
+let pendingDrafts=new Map(), remoteConflicts=new Map();
+let sharedPullBusy=false, sharedSocket=null, sharedHeartbeat=null, sharedReconnect=null, sharedPullTimer=null;
+let sharedInitialEpoch=0, sharedSavingError=false, sharedRetryDelay=650;
+function canonical(value){
+  if(Array.isArray(value))return '['+value.map(canonical).join(',')+']';
+  if(value&&typeof value==='object')return '{'+Object.keys(value).sort().filter(k=>value[k]!==undefined).map(k=>JSON.stringify(k)+':'+canonical(value[k])).join(',')+'}';
+  return JSON.stringify(value);
+}
+function normalizeDoc(id,value){
+  if(id!=='structure')return {title:value?.title||'',html:value?.html||'',scratch:typeof value?.scratch==='string'?value.scratch:''};
+  return value||{genres:[]};
+}
+function currentDoc(id){
+  if(id==='structure')return structureSnapshot();
+  const n=allLocalNotes().get(id.slice(5));return n?noteSnapshot(n):null;
+}
+function pendingStorageKey(){return PENDING_PREFIX+(syncSession?.user?.id||'unknown')}
+function rescueStorageKey(){return RESCUE_PREFIX+(syncSession?.user?.id||'unknown')}
+function writePending(){
+  try{localStorage.setItem(pendingStorageKey(),JSON.stringify(Object.fromEntries(pendingDrafts)));return true}
+  catch(e){sharedSavingError=true;showSharedStatus('重要：端末内の未同期データを保存できません（容量不足）。文章をコピーしてください');return false}
+}
+function recoverPending(){
+  let drafts={};try{drafts=JSON.parse(localStorage.getItem(pendingStorageKey())||'{}')||{}}catch(e){}
+  pendingDrafts=new Map(Object.entries(drafts));
+}
+function backupConflict(id,local,remote){
+  try{
+    const key=rescueStorageKey(),records=JSON.parse(localStorage.getItem(key)||'[]');
+    records.push({date:new Date().toISOString(),id,local,remote});
+    // Keep 25 past choices so an accidental selection is not irrecoverable.
+    localStorage.setItem(key,JSON.stringify(records.slice(-25)));
+  }catch(e){showSharedStatus('履歴の退避に失敗しました。端末版を別の場所へコピーしてください');}
+}
+function setBaseline(id,row){
+  sharedVersions.set(id,row.version);
+  sharedBase.set(id,canonical(normalizeDoc(id,row.payload)));
+}
+function rebuildLocalBaselineIndicators(){
+  sharedLastStructure=canonical(structureSnapshot());
+  sharedLastNotes=new Map([...allLocalNotes()].map(([id,n])=>[id,canonical(noteSnapshot(n))]));
+}
+function markPending(id,payload){
+  const normalized=normalizeDoc(id,payload),base=sharedBase.get(id);
+  if(base!==undefined && canonical(normalized)===base){
+    pendingDrafts.delete(id);sharedDirty.delete(id);sharedConflict.delete(id);remoteConflicts.delete(id);
+  }else{
+    const previous=pendingDrafts.get(id);
+    pendingDrafts.set(id,{payload:structuredClone(normalized),baseVersion:previous?.baseVersion??sharedVersions.get(id)??null,basePayload:previous?.basePayload??base??null});
+    sharedDirty.add(id);
+  }
+  writePending();
+}
+function updateSyncLabel(){
+  cloudDirty=sharedDirty.size>0;
+  if(sharedSavingError){showSharedStatus('端末保存エラー：書いた内容を別の場所にコピーしてください');return}
+  if(sharedConflict.size){showSharedStatus('競合 '+sharedConflict.size+'件：タップして内容を確認');return}
+  if(!navigator.onLine && sharedDirty.size){showSharedStatus('オフライン：端末に未同期の変更あり');return}
+  if(sharedDirty.size){showSharedStatus(sharedBusy?'クラウドへ保存中…':'未同期 '+sharedDirty.size+'件（端末に保存）');return}
+  if(sharedBusy){showSharedStatus('クラウドへ保存中…');return}
+  if(!sharedEnabled){showSharedStatus('クラウド未接続');return}
+  showSharedStatus('クラウド同期完了');
 }
 function detectSharedChanges(){
- if(!sharedEnabled)return;
- const structure=JSON.stringify(structureSnapshot());
- if(structure!==sharedLastStructure)sharedDirty.add('structure');
- for(const [id,n] of allLocalNotes())if(JSON.stringify(noteSnapshot(n))!==sharedLastNotes.get(id))sharedDirty.add('note:'+id);
- cloudDirty=sharedDirty.size>0;
- if(cloudDirty){showSharedStatus(sharedConflict.size?'競合あり：確認が必要':'クラウドへ保存待ち');queueCloudSync()}
+  if(!sharedEnabled)return;
+  const structure=structureSnapshot();
+  if(canonical(structure)!==sharedBase.get('structure'))markPending('structure',structure);
+  else if(sharedDirty.has('structure'))markPending('structure',structure);
+  for(const [id,n] of allLocalNotes()){
+    const key='note:'+id,payload=noteSnapshot(n);
+    if(canonical(payload)!==sharedBase.get(key)||sharedDirty.has(key))markPending(key,payload);
+  }
+  updateSyncLabel();
+  if(sharedDirty.size && !sharedConflict.size)queueCloudSync();
 }
 function mergeStructure(remote){
- // Preserve this device's current editor selection and local-only width.
- const oldNotes=allLocalNotes(), activeGenreId=data.genres[data.activeGenre]?.id;
- const activeCategory=data.activeCategoryId,activeNote=data.activeNoteIndex;
- const incoming=structuredClone(remote.genres||[]);
- const walk=nodes=>(nodes||[]).forEach(c=>{
-  c.notes=(c.notes||[]).map(n=>({id:n.id,title:oldNotes.get(n.id)?.title||'',html:oldNotes.get(n.id)?.html||'',scratch:oldNotes.get(n.id)?.scratch||''}));walk(c.children)
- });
- incoming.forEach(g=>walk(g.categories));data.genres=incoming;
- const ix=incoming.findIndex(g=>g.id===activeGenreId);data.activeGenre=ix>=0?ix:0;
- data.activeCategoryId=activeCategory;data.activeNoteIndex=activeNote;
- normalizeCategoriesAll();
- if(!findCategory(data.activeCategoryId)){
-  data.activeCategoryId=currentGenre()?.categories?.[0]?.id;data.activeNoteIndex=0;
- }
+  const oldNotes=allLocalNotes(),oldId=data.genres[data.activeGenre]?.id;
+  const oldCategory=data.activeCategoryId,oldNote=data.activeNoteIndex;
+  const incoming=structuredClone(remote?.genres||[]);
+  const walk=nodes=>(nodes||[]).forEach(c=>{
+    c.notes=(c.notes||[]).map(n=>({id:n.id,title:oldNotes.get(n.id)?.title||'',html:oldNotes.get(n.id)?.html||'',scratch:oldNotes.get(n.id)?.scratch||''}));walk(c.children);
+  });
+  incoming.forEach(g=>walk(g.categories));data.genres=incoming;
+  const idx=incoming.findIndex(g=>g.id===oldId);data.activeGenre=idx>=0?idx:0;
+  data.activeCategoryId=oldCategory;data.activeNoteIndex=oldNote;
+  normalizeCategoriesAll();
+  if(!findCategory(data.activeCategoryId)){
+    const first=currentGenre()?.categories?.[0];data.activeCategoryId=first?.id;data.activeNoteIndex=0;
+  }
+}
+function applyRemoteDoc(id,payload){
+  if(id==='structure'){clearCategoryHistories();mergeStructure(payload);return true}
+  const n=allLocalNotes().get(id.slice(5));
+  if(!n)return false;
+  Object.assign(n,normalizeDoc(id,payload));
+  memoHistories.delete(n.id);scratchHistories?.delete?.(n.id);
+  return true;
+}
+function registerConflict(id,row){
+  if(!row)return;
+  remoteConflicts.set(id,{version:row.version,payload:structuredClone(normalizeDoc(id,row.payload))});
+  sharedConflict.add(id);sharedDirty.add(id);
+  updateSyncLabel();
+}
+// A note consists of independent title / rich-text body / scratchpad fields.
+// If two devices changed DIFFERENT fields, merge them without a destructive choice.
+// If the same field changed to different values, stop and show the conflict UI.
+function tryMergeIndependentNoteFields(id,row){
+  if(id==='structure'||!row)return false;
+  const baseText=pendingDrafts.get(id)?.basePayload??sharedBase.get(id);
+  if(!baseText)return false;
+  let base;try{base=normalizeDoc(id,JSON.parse(baseText))}catch(e){return false}
+  const local=currentDoc(id);if(!local)return false;
+  const remote=normalizeDoc(id,row.payload),merged={};
+  for(const field of ['title','html','scratch']){
+    const lChanged=local[field]!==base[field],rChanged=remote[field]!==base[field];
+    if(lChanged&&rChanged&&local[field]!==remote[field])return false;
+    merged[field]=lChanged?local[field]:remote[field];
+  }
+  const n=allLocalNotes().get(id.slice(5));if(!n)return false;
+  setBaseline(id,row);
+  Object.assign(n,merged);
+  pendingDrafts.delete(id);
+  markPending(id,merged);
+  memoHistories.delete(n.id);
+  if(canonical(merged)!==canonical(local)){
+    // Sync the visible editor to include the other device's independent field.
+    const active=currentNote();
+    if(active?.id===n.id){loadNote();updateMemoHistoryButtons()}
+  }
+  return true;
 }
 async function fetchSharedRows(){
- const rows=await sharedRequest('GET','?select=doc_id,payload,version&order=doc_id.asc&limit=10000');
- return new Map((rows||[]).map(r=>[r.doc_id,r]));
+  // Full download only on initial login/import; media may be embedded in payload.
+  const rows=await sharedRequest('GET','?select=doc_id,payload,version&order=doc_id.asc&limit=10000');
+  if(!Array.isArray(rows))throw new Error('クラウドの応答が不正です');
+  if(rows.length>=10000)throw new Error('データ件数上限です。同期を停止しました');
+  return new Map(rows.map(r=>[r.doc_id,r]));
 }
-async function startShared(announce){
- if(!syncSession)return;
- try{
-  const rows=await fetchSharedRows();
-  if(!rows.has('structure')){
-   sharedEnabled=false;
-   const copy=document.getElementById('testCopyFromStable');
-   copy.hidden=rows.size!==0;
-   showSharedStatus(rows.size===0
-     ? 'テスト版は未登録です。「安定版のメモをテスト版へコピー」を押してください。'
-     : 'テスト用データが不完全です。上書きせず、設定を確認してください。');
-   return;
-  }
-  document.getElementById('testCopyFromStable').hidden=true;
-  // Never silently discard unsaved local edits on initial connection.
-  sharedEnabled=true;sharedInitialized=true;
-  sharedVersions=new Map([...rows].map(([id,r])=>[id,r.version]));
-  sharedBase=new Map([...rows].map(([id,r])=>[id,JSON.stringify(r.payload)]));
-  sharedDirty.clear();sharedConflict.clear();
-  // Preserve category undo stacks after reload only when the local tree and
-  // authenticated cloud tree are identical. Never replay outdated history.
-  const sameSavedTree=JSON.stringify(structureSnapshot())===JSON.stringify(rows.get('structure').payload);
-  memoHistories.clear();if(!sameSavedTree)clearCategoryHistories();
+async function fetchVersionHeaders(){
+  // Poll ONLY tiny (doc_id, version) pairs. Never re-download full HTML/images every 2.5s.
+  const rows=await sharedRequest('GET','?select=doc_id,version&order=doc_id.asc&limit=10000');
+  if(!Array.isArray(rows)||rows.length>=10000)throw new Error('同期一覧を取得できません');
+  return rows;
+}
+async function fetchSharedRow(id){
+  const rows=await sharedRequest('GET','?doc_id=eq.'+encodeURIComponent(id)+'&select=doc_id,payload,version&limit=1');
+  return rows?.[0]||null;
+}
+function restoreDurableDrafts(rows){
+  // First set the cloud's last confirmed state. Never use the local cache as its version.
+  sharedVersions=new Map();sharedBase=new Map();
+  for(const [id,row] of rows)setBaseline(id,row);
   mergeStructure(rows.get('structure').payload);
   for(const [id,n] of allLocalNotes()){
-   const r=rows.get('note:'+id);if(r)Object.assign(n,r.payload);
+    const row=rows.get('note:'+id);if(row)Object.assign(n,normalizeDoc('note:'+id,row.payload));
   }
-  updateSharedBaseline();localSaveOnly();renderAll();loadNote();updateMemoHistoryButtons();
-  showSharedStatus('共有メモ同期済み');
-  unlockMemo();
-  if(sharedPoll)clearInterval(sharedPoll);
-  sharedPoll=setInterval(()=>pollShared().catch(e=>showSharedStatus('同期エラー：'+e.message)),5000);
- }catch(e){showSharedStatus('共有メモ接続失敗：'+e.message)}
+  sharedDirty.clear();sharedConflict.clear();remoteConflicts.clear();
+  // Restore pending structure before pending notes so newly-created notes stay addressable.
+  if(pendingDrafts.has('structure')){
+    const draft=pendingDrafts.get('structure');mergeStructure(draft.payload);
+  }
+  for(const [id,draft] of pendingDrafts){
+    if(id==='structure')continue;
+    const n=allLocalNotes().get(id.slice(5));if(n)Object.assign(n,normalizeDoc(id,draft.payload));
+  }
+  for(const [id,draft] of [...pendingDrafts]){
+    const row=rows.get(id),live=currentDoc(id);
+    if(!live){pendingDrafts.delete(id);continue}
+    const cloudPayload=canonical(normalizeDoc(id,row?.payload));
+    if(cloudPayload===canonical(live)){
+      pendingDrafts.delete(id);continue;
+    }
+    sharedDirty.add(id);
+    // Another device has already changed this document since our local draft began.
+    const original= draft.basePayload ?? null;
+    const sameBase=original!==null ? original===cloudPayload : (draft.baseVersion===null && !row);
+    if(!sameBase){registerConflict(id,row)}
+  }
+  writePending();
+  rebuildLocalBaselineIndicators();
 }
-function localSaveOnly(){try{localStorage.setItem(KEY,JSON.stringify(data))}catch(e){showSharedStatus('端末保存失敗：'+e.message)}}
+async function startShared(announce){
+  if(!syncSession)return;
+  const epoch=++sharedInitialEpoch;
+  try{
+    // When a browser is upgraded from older versions, retain an emergency copy
+    // before applying the cloud snapshot. This is not used for blind cloud writes.
+    const legacyKey=LEGACY_RESCUE_PREFIX+syncSession.user.id;
+    if(!localStorage.getItem(legacyKey)){
+      try{localStorage.setItem(legacyKey,JSON.stringify({time:new Date().toISOString(),data}))}catch(e){}
+    }
+    recoverPending();
+    const rows=await fetchSharedRows();if(epoch!==sharedInitialEpoch)return;
+    if(!rows.has('structure')){
+      sharedEnabled=false;
+      document.getElementById('testCopyFromStable').hidden=rows.size!==0;
+      showSharedStatus(rows.size===0?'テスト版は未登録です。最初にコピーしてください':'データが不完全です。上書きを中止しました');
+      return;
+    }
+    document.getElementById('testCopyFromStable').hidden=true;
+    sharedEnabled=true;sharedInitialized=true;
+    memoHistories.clear();clearCategoryHistories();
+    restoreDurableDrafts(rows);
+    localSaveOnly();renderAll();loadNote();updateMemoHistoryButtons();
+    unlockMemo();updateSyncLabel();
+    if(sharedPoll)clearInterval(sharedPoll);
+    sharedPoll=setInterval(()=>pollShared().catch(e=>{showSharedStatus('同期取得失敗：'+e.message)}),REMOTE_POLL_MS);
+    startRealtime();
+    if(sharedDirty.size && !sharedConflict.size)queueCloudSync();
+  }catch(e){showSharedStatus('共有メモ接続失敗：'+e.message)}
+}
+function localSaveOnly(){
+ try{localStorage.setItem(KEY,JSON.stringify(data))}
+ catch(e){sharedSavingError=true;showSharedStatus('端末保存エラー：容量を確認し、文章を別にコピーしてください')}
+}
 async function initializeShared(){
- // Test bootstrap deliberately reads the stable table only via GET and writes ONLY to SHARED_TABLE.
+ // First-device bootstrap ONLY reads the stable table and writes test records.
  if(!syncSession){setSyncStatus('まずテスト版にログインしてください');return}
  const existing=await fetchSharedRows().catch(e=>{showSharedStatus('テスト版接続エラー：'+e.message);return null});
  if(!existing)return;
- if(existing.size!==0){showSharedStatus('テスト版にはすでにデータがあります。上書きしないためコピーを中止しました。');return}
- if(!await confirmAction('安定版のメモをテスト用にコピーしますか？\n\n安定版のデータは変更しません。テスト版で編集しても本番には反映されません。',{title:'テスト版へのコピー確認',confirmLabel:'テスト版へコピー',danger:false}))return;
- const button=document.getElementById('testCopyFromStable');
- button.disabled=true;
- showSharedStatus('安定版からテストへコピーしています…');
+ if(existing.size!==0){showSharedStatus('テスト版にはデータがあります。上書きを中止しました');return}
+ if(!await confirmAction('安定版のメモをテスト用にコピーしますか？\n\n安定版は変更しません。',{title:'テスト版へのコピー確認',confirmLabel:'テスト版へコピー',danger:false}))return;
+ const button=document.getElementById('testCopyFromStable');button.disabled=true;
+ showSharedStatus('安定版からコピーしています…');
  try{
-  const cfg=syncCfg();
-  if(!cfg?.url||!cfg?.key)throw new Error('Supabase接続設定がありません');
-  // Refresh expired session through test-table read, never with a production write.
-  await fetchSharedRows();
+  const cfg=syncCfg();await fetchSharedRows();
   const url=normalizeSupabaseUrl(cfg.url)+'/rest/v1/memo_shared_v6?select=doc_id,payload,version&order=doc_id.asc&limit=10000';
   const response=await fetch(url,{method:'GET',headers:{apikey:cfg.key,Authorization:'Bearer '+syncSession.access_token},cache:'no-store'});
-  if(!response.ok)throw new Error('安定版の読み込みに失敗：HTTP '+response.status);
+  if(!response.ok)throw new Error('安定版を読み込めません：HTTP '+response.status);
   const stableRows=await response.json();
-  if(!Array.isArray(stableRows)||!stableRows.some(r=>r.doc_id==='structure'))throw new Error('安定版データが見つかりませんでした。コピーを中止しました');
-  if(stableRows.length>=10000)throw new Error('メモ数が多すぎるため、安全のためコピーを中止しました');
-  const stillEmpty=await fetchSharedRows();
-  if(stillEmpty.size!==0)throw new Error('他の端末でテスト版が初期化されました。上書きを中止しました');
+  if(!Array.isArray(stableRows)||!stableRows.some(r=>r.doc_id==='structure'))throw new Error('安定版データがありません');
+  if(stableRows.length>=10000)throw new Error('メモ数の上限によりコピーを停止しました');
+  if((await fetchSharedRows()).size!==0)throw new Error('他端末でテスト版が作成されました。コピー中止');
   const records=stableRows.map(r=>({user_id:syncSession.user.id,doc_id:r.doc_id,payload:r.payload,version:1}));
-  // Supabase test-only table; all rows are a snapshot, no production mutation.
   await sharedRequest('POST','?on_conflict=user_id,doc_id',records,'resolution=ignore-duplicates,return=minimal');
   await startShared(true);
-  if(sharedEnabled)showSharedStatus('テスト版へのコピーが完了しました。安定版とは別々に保存されます');
- }catch(e){showSharedStatus('テスト版へのコピーに失敗：'+e.message)}
+ }catch(e){showSharedStatus('コピー失敗：'+e.message)}
  finally{button.disabled=false}
 }
+class RemoteConflictError extends Error{}
+class MergeRetryError extends Error{}
 async function pushSharedOne(id){
- const isStructure=id==='structure',n=isStructure?null:allLocalNotes().get(id.slice(5));
- if(!isStructure&&!n){sharedDirty.delete(id);return}
- const payload=isStructure?structureSnapshot():noteSnapshot(n);
- const v=sharedVersions.get(id);
- if(v===undefined){
-  await sharedRequest('POST','?on_conflict=user_id,doc_id',[{user_id:syncSession.user.id,doc_id:id,payload,version:1}],'resolution=ignore-duplicates,return=minimal');
-  const rows=await fetchSharedRows();const row=rows.get(id);
-  if(JSON.stringify(row?.payload)!==JSON.stringify(payload))throw new Error('同じメモが先に登録されました。競合を確認してください');
-  sharedVersions.set(id,row.version);
- }else{
-  const path='?user_id=eq.'+encodeURIComponent(syncSession.user.id)+'&doc_id=eq.'+encodeURIComponent(id)+'&version=eq.'+v+'&select=doc_id,version';
-  const result=await sharedRequest('PATCH',path,{payload,version:v+1},'return=representation');
-  if(!result?.length)throw new Error('別の端末で更新されました。上書きを停止しました');
-  sharedVersions.set(id,v+1);
- }
- sharedBase.set(id,JSON.stringify(payload));
- if(isStructure)sharedLastStructure=JSON.stringify(payload);
- else sharedLastNotes.set(id.slice(5),JSON.stringify(payload));
- sharedDirty.delete(id);
+  const payload=currentDoc(id);
+  if(!payload){sharedDirty.delete(id);pendingDrafts.delete(id);writePending();return}
+  const draft=structuredClone(payload),v=sharedVersions.get(id);
+  let newVersion;
+  if(v===undefined){
+    // Use INSERT/DO NOTHING. Never unconditionally overwrite an existing row.
+    await sharedRequest('POST','?on_conflict=user_id,doc_id',[{user_id:syncSession.user.id,doc_id:id,payload:draft,version:1}],'resolution=ignore-duplicates,return=minimal');
+    const row=await fetchSharedRow(id);
+    if(!row)throw new Error('クラウドへの追加を確認できませんでした');
+    if(canonical(normalizeDoc(id,row.payload))!==canonical(draft)){registerConflict(id,row);throw new RemoteConflictError('別端末でも追加されました')}
+    newVersion=row.version;
+  }else{
+    const path='?user_id=eq.'+encodeURIComponent(syncSession.user.id)+'&doc_id=eq.'+encodeURIComponent(id)+'&version=eq.'+v+'&select=doc_id,version';
+    const result=await sharedRequest('PATCH',path,{payload:draft,version:v+1},'return=representation');
+    if(!result?.length){
+      const row=await fetchSharedRow(id);
+      if(row && canonical(normalizeDoc(id,row.payload))===canonical(draft)){newVersion=row.version}
+      else if(tryMergeIndependentNoteFields(id,row)){throw new MergeRetryError('別々の欄の編集を安全に結合しました')}
+      else{registerConflict(id,row);throw new RemoteConflictError('別端末が先に更新しました')}
+    }else newVersion=result[0].version;
+  }
+  setBaseline(id,{version:newVersion,payload:draft});
+  const latest=currentDoc(id);
+  if(latest&&canonical(latest)===canonical(draft)){
+    sharedDirty.delete(id);pendingDrafts.delete(id);
+  }else if(latest){
+    // A user typed more WHILE the first HTTP request was in flight.
+    // Preserve that new text and push again using the new cloud version.
+    pendingDrafts.set(id,{payload:structuredClone(latest),baseVersion:newVersion,basePayload:canonical(draft)});
+    sharedDirty.add(id);
+  }
+  writePending();
 }
 async function pushCloud(){
- if(!sharedEnabled){showSharedStatus('共有メモが未接続です。ログイン・初期登録を確認してください');return false}
- if(sharedBusy)return false;
- saveCurrentWithoutCloud();detectSharedChanges();
- if(sharedConflict.size){showSharedStatus('競合あり。別端末の変更を確認してください');return false}
- sharedBusy=true;
- try{
-  for(const id of [...sharedDirty]){
-   try{await pushSharedOne(id)}catch(e){sharedConflict.add(id);throw e}
+  if(!sharedEnabled){showSharedStatus('未接続：ログインを確認してください');return false}
+  if(sharedBusy)return false;
+  saveCurrentWithoutCloud();detectSharedChanges();
+  if(sharedConflict.size){updateSyncLabel();return false}
+  if(!sharedDirty.size){updateSyncLabel();return true}
+  sharedBusy=true;updateSyncLabel();let ok=true;
+  try{
+    // Notes first, then structure: newly created channels won't appear without content.
+    const batch=[...sharedDirty].sort((a,b)=>(a==='structure'?1:0)-(b==='structure'?1:0));
+    for(const id of batch){
+      if(!sharedDirty.has(id))continue;
+      try{await pushSharedOne(id)}
+      catch(e){ok=false;
+        if(e instanceof MergeRetryError){ok=true;break}
+        if(e instanceof RemoteConflictError)showSharedStatus('別端末の変更を検出。内容の確認が必要です');
+        else showSharedStatus('未同期：通信エラー（自動再試行）'+e.message);
+        break;
+      }
+    }
+  }finally{
+    sharedBusy=false;cloudDirty=sharedDirty.size>0;
+    if(ok){sharedRetryDelay=650;updateSyncLabel()}
+    else sharedRetryDelay=Math.min(30000,Math.max(5000,sharedRetryDelay*2));
+    // A save can be requested while sharedBusy=true; never silently drop that request.
+    if(sharedDirty.size&&!sharedConflict.size)queueCloudSync(sharedRetryDelay);
   }
-  cloudDirty=false;showSharedStatus('クラウド保存済み');return true;
- }catch(e){showSharedStatus('保存停止：'+e.message);return false}
- finally{sharedBusy=false}
+  return ok&&!sharedDirty.size&&!sharedConflict.size;
 }
-function queueCloudSync(){clearTimeout(syncTimer);syncTimer=setTimeout(()=>{if(sharedEnabled&&!sharedBusy&&sharedDirty.size)pushCloud()},1300)}
+function queueCloudSync(delay=650){
+  clearTimeout(syncTimer);
+  if(!sharedEnabled||!sharedDirty.size||sharedConflict.size)return;
+  syncTimer=setTimeout(()=>{if(sharedBusy){queueCloudSync();return}pushCloud()},delay);
+}
 async function pollShared(){
- if(!sharedEnabled||sharedBusy||document.hidden)return;
- // Flush the visible editor to the in-memory model before comparing remote data.
- saveCurrentWithoutCloud();detectSharedChanges();
- const rows=await fetchSharedRows();let changed=false,structureChanged=false;
- const remoteStructure=rows.get('structure');
- if(remoteStructure&&remoteStructure.version!==sharedVersions.get('structure')){
-  if(sharedDirty.has('structure')){sharedConflict.add('structure')}
-  else{clearCategoryHistories();mergeStructure(remoteStructure.payload);sharedVersions.set('structure',remoteStructure.version);sharedBase.set('structure',JSON.stringify(remoteStructure.payload));structureChanged=true;changed=true}
- }
- const notes=allLocalNotes();
- for(const [id,n] of notes){
-  const key='note:'+id,r=rows.get(key);if(!r)continue;
-  if(r.version===sharedVersions.get(key))continue;
-  if(sharedDirty.has(key)){sharedConflict.add(key);continue}
-  memoHistories.delete(id);Object.assign(n,r.payload);sharedVersions.set(key,r.version);sharedBase.set(key,JSON.stringify(r.payload));changed=true;
- }
- if(changed){updateSharedBaseline();localSaveOnly();if(document.activeElement!==document.getElementById("editor")&&document.activeElement!==document.getElementById("noteTitle")&&document.activeElement!==document.getElementById("scratchText")){renderAll();loadNote()}}
- if(sharedConflict.size)showSharedStatus('競合あり：別端末でも編集されています');
- else if(!sharedDirty.size)showSharedStatus('共有メモ同期済み');
+ if(!sharedEnabled||sharedBusy||sharedPullBusy||document.hidden)return;
+ sharedPullBusy=true;
+ try{
+  saveCurrentWithoutCloud();detectSharedChanges();
+  const headers=await fetchVersionHeaders();
+  // Edits made during HTTP requests must be flagged before cloud changes are applied.
+  saveCurrentWithoutCloud();detectSharedChanges();
+  let changed=false, visibleChanged=false;
+  const visibleNoteId=currentNote()?.id;
+  const ids=headers.filter(r=>r.version!==sharedVersions.get(r.doc_id)).map(r=>r.doc_id);
+  ids.sort((a,b)=>(a==='structure'?-1:0)-(b==='structure'?-1:0));
+  for(const id of ids){
+    const row=await fetchSharedRow(id);if(!row)continue;
+    // Check again: the user may have edited while fetching this document.
+    saveCurrentWithoutCloud();detectSharedChanges();
+    const currentVersion=sharedVersions.get(id);
+    if(row.version===currentVersion)continue;
+    const cloud=canonical(normalizeDoc(id,row.payload));
+    const local=currentDoc(id);
+    if(sharedDirty.has(id)){
+      if(local && canonical(local)===cloud){
+        setBaseline(id,row);sharedDirty.delete(id);pendingDrafts.delete(id);sharedConflict.delete(id);remoteConflicts.delete(id);writePending();
+      }else if(tryMergeIndependentNoteFields(id,row)){changed=true;if(id==='note:'+visibleNoteId)visibleChanged=true}
+      else registerConflict(id,row);
+      continue;
+    }
+    if(applyRemoteDoc(id,row.payload)){changed=true;if(id==='structure'||id==='note:'+visibleNoteId)visibleChanged=true}
+    setBaseline(id,row);
+  }
+  if(changed){localSaveOnly();renderAll();if(visibleChanged){loadNote();updateMemoHistoryButtons()}}
+  rebuildLocalBaselineIndicators();
+  updateSyncLabel();
+  if(sharedDirty.size&&!sharedConflict.size)queueCloudSync();
+ }finally{sharedPullBusy=false}
 }
 async function pullCloud(){
  if(!sharedEnabled){await startShared(true);return}
- if(sharedDirty.size||sharedConflict.size){showSharedStatus('未保存または競合があるため読み込みを中止しました');return}
  await pollShared();
+ if(sharedConflict.size)openConflictDialog();
 }
 function saveCurrentWithoutCloud(){
  const n=currentNote();if(!n)return;
- n.title=document.getElementById('noteTitle').value;n.html=plainEditorHtml();const scratch=document.getElementById('scratchText');if(n.id&&scratch.dataset.noteId===n.id)n.scratch=scratch.value;localSaveOnly();
+ n.title=document.getElementById('noteTitle').value;
+ n.html=plainEditorHtml();
+ const scratch=document.getElementById('scratchText');
+ if(n.id&&scratch.dataset.noteId===n.id)n.scratch=scratch.value;
+ localSaveOnly();
 }
 function normalizeCategoriesAll(){(data.genres||[]).forEach(g=>normalizeCategories(g.categories||[]));if(!data.activeCategoryId){data.activeCategoryId=data.genres[data.activeGenre||0]?.categories?.[0]?.id;data.activeNoteIndex=0}}
 const _localSave=save;
 save=function(){_localSave();if(sharedEnabled)detectSharedChanges()};
 async function syncLogout(){
- if(sharedDirty.size){setSyncStatus('未保存の変更があります。ログアウト前に保存してください');return}
- if(sharedPoll)clearInterval(sharedPoll);sharedEnabled=false;
- if(supabaseClient)await supabaseClient.auth.signOut();syncSession=null;lockMemo('ログアウトしました');showSharedStatus('ログアウトしました');
+ if(sharedDirty.size||sharedConflict.size){setSyncStatus('未同期データがあります。ログアウトせず同期・競合を確認してください');return}
+ if(sharedPoll)clearInterval(sharedPoll);stopRealtime();sharedEnabled=false;sharedInitialEpoch++;
+ if(supabaseClient)await supabaseClient.auth.signOut();syncSession=null;
+ lockMemo('ログアウトしました');showSharedStatus('ログアウトしました');
 }
+// Supabase Realtime listens for commit notifications; REST still performs
+// authoritative versioned reads. Fallback polling works without a publication.
+function stopRealtime(){
+ clearInterval(sharedHeartbeat);clearTimeout(sharedReconnect);clearTimeout(sharedPullTimer);
+ if(sharedSocket){try{sharedSocket.onclose=null;sharedSocket.close()}catch(e){}sharedSocket=null}
+}
+function scheduleRealtimePull(){
+ clearTimeout(sharedPullTimer);
+ sharedPullTimer=setTimeout(()=>pollShared().catch(e=>showSharedStatus('同期取得失敗：'+e.message)),120);
+}
+function startRealtime(){
+ stopRealtime();if(!sharedEnabled||!syncSession||typeof WebSocket==='undefined')return;
+ let baseUrl;try{baseUrl=new URL(normalizeSupabaseUrl(syncCfg().url))}catch(e){return}
+ const wsUrl=(baseUrl.protocol==='https:'?'wss:':'ws:')+'//'+baseUrl.host+'/realtime/v1/websocket?apikey='+encodeURIComponent(syncCfg().key)+'&vsn=1.0.0';
+ const topic='realtime:memo-test-'+syncSession.user.id;
+ try{
+  const socket=new WebSocket(wsUrl);sharedSocket=socket;
+  let ref=1;
+  const send=(event,payload={},channel=topic)=>{if(socket.readyState===WebSocket.OPEN)socket.send(JSON.stringify({topic:channel,event,payload,ref:String(ref++),join_ref:channel==='phoenix'?null:'1'}))};
+  socket.onopen=()=>{
+    send('phx_join',{config:{broadcast:{ack:false,self:false},presence:{key:''},postgres_changes:[{event:'*',schema:'public',table:SHARED_TABLE,filter:'user_id=eq.'+syncSession.user.id}]},access_token:syncSession.access_token});
+    sharedHeartbeat=setInterval(()=>send('heartbeat',{},'phoenix'),25000);
+  };
+  socket.onmessage=e=>{
+    let message;try{message=JSON.parse(e.data)}catch(err){return}
+    if(message.event==='postgres_changes')scheduleRealtimePull();
+    // In some Realtime releases the event wrapper is broadcast.
+    if(message.event==='broadcast'&&message.payload?.event==='memo_changed')scheduleRealtimePull();
+  };
+  socket.onclose=()=>{clearInterval(sharedHeartbeat);if(sharedSocket===socket&&sharedEnabled){sharedReconnect=setTimeout(startRealtime,6500)}};
+  socket.onerror=()=>{}; // Polling remains active if Realtime is not configured.
+ }catch(e){/* Polling is the safe fallback. */}
+}
+document.addEventListener('visibilitychange',()=>{
+ if(!document.hidden&&sharedEnabled){pollShared().catch(()=>{});if(sharedDirty.size)queueCloudSync()}
+});
+window.addEventListener('online',()=>{if(sharedEnabled){pollShared().catch(()=>{});if(sharedDirty.size)queueCloudSync()}});
+window.addEventListener('focus',()=>{if(sharedEnabled)pollShared().catch(()=>{})});
+// Conflict recovery: never silently pick one of the two documents.
+function conflictLabel(id){
+ if(id==='structure')return 'カテゴリー・チャンネルの構成';
+ const n=allLocalNotes().get(id.slice(5));return '# '+(n?.title||'チャンネル '+id.slice(5,13));
+}
+function openConflictDialog(){
+ if(!sharedConflict.size)return;
+ const box=document.getElementById('syncConflictBack');
+ const select=document.getElementById('syncConflictSelect');
+ select.replaceChildren();
+ for(const id of sharedConflict){const option=document.createElement('option');option.value=id;option.textContent=conflictLabel(id);select.appendChild(option)}
+ box.classList.add('show');updateConflictPreview();
+}
+function closeConflictDialog(){document.getElementById('syncConflictBack').classList.remove('show')}
+function updateConflictPreview(){
+ const id=document.getElementById('syncConflictSelect').value;
+ const local=currentDoc(id),remote=remoteConflicts.get(id)?.payload;
+ const pretty=value=>JSON.stringify(value??null,null,2);
+ document.getElementById('syncLocalPreview').value=pretty(local);
+ document.getElementById('syncRemotePreview').value=pretty(remote);
+}
+document.getElementById('syncConflictSelect').onchange=updateConflictPreview;
+document.getElementById('syncConflictClose').onclick=closeConflictDialog;
+document.getElementById('syncConflictOpen').onclick=openConflictDialog;
+document.getElementById('saveState').addEventListener('click',()=>{if(sharedConflict.size)openConflictDialog()});
+document.getElementById('syncConflictCopy').onclick=async()=>{
+ const id=document.getElementById('syncConflictSelect').value;
+ const both=JSON.stringify({doc_id:id,local:currentDoc(id),cloud:remoteConflicts.get(id)?.payload},null,2);
+ try{await navigator.clipboard.writeText(both);showSharedStatus('競合した両方のデータをコピーしました')}
+ catch(e){document.getElementById('syncLocalPreview').select();showSharedStatus('コピーできませんでした。表示中の文章を手動でコピーしてください')}
+};
+async function resolveSelectedConflict(useLocal){
+ const id=document.getElementById('syncConflictSelect').value;if(!sharedConflict.has(id))return;
+ const confirmed=await confirmAction(useLocal
+   ?'この端末の内容を優先してクラウドへ保存します。\n※ クラウドの現在の内容が置き換わります。\n※ 両方の内容は端末内の復旧履歴にも保管されます。'
+   :'クラウドの内容をこの端末に読み込みます。\n※ 端末側の未同期の変更が置き換わります。\n※ 両方の内容は端末内の復旧履歴にも保管されます。',
+   {title:useLocal?'端末版で上書きする確認':'クラウド版を採用する確認',confirmLabel:'内容を確認して実行',danger:true});
+ if(!confirmed)return;
+ const row=await fetchSharedRow(id);
+ if(!row){showSharedStatus('最新のクラウドデータを確認できません');return}
+ const previouslySeen=remoteConflicts.get(id);
+ if(!previouslySeen||row.version!==previouslySeen.version){registerConflict(id,row);updateConflictPreview();showSharedStatus('他の端末でさらに変更されました。内容をもう一度確認してください');return}
+ const local=currentDoc(id);backupConflict(id,structuredClone(local),structuredClone(row.payload));
+ setBaseline(id,row);sharedConflict.delete(id);remoteConflicts.delete(id);
+ if(useLocal){
+   markPending(id,local);closeConflictDialog();updateSyncLabel();queueCloudSync();
+ }else{
+   applyRemoteDoc(id,row.payload);pendingDrafts.delete(id);sharedDirty.delete(id);writePending();
+   localSaveOnly();renderAll();loadNote();closeConflictDialog();updateSyncLabel();
+ }
+ if(sharedConflict.size)openConflictDialog();
+}
+document.getElementById('syncConflictUseLocal').onclick=()=>resolveSelectedConflict(true).catch(e=>showSharedStatus('競合解決エラー：'+e.message));
+document.getElementById('syncConflictUseRemote').onclick=()=>resolveSelectedConflict(false).catch(e=>showSharedStatus('競合解決エラー：'+e.message));
 // Login screen: existing config is stored only on the current device.
 const gateCfg=syncCfg()||{};
 document.getElementById('gateEmail').value=gateCfg.email||'';
@@ -2767,7 +3093,7 @@ normalizeCategories(currentGenre().categories);if(!data.activeCategoryId)data.ac
 /* v6.5: PWA update detection + user-initiated safe refresh. */
 (function(){
  'use strict';
- const INSTALLED_BUILD='6.13.0';
+ const INSTALLED_BUILD='6.14.0';
  const intervalMs=10*60*1000;
  const status=document.getElementById('appUpdateStatus');
  const buildLabel=document.getElementById('appBuildLabel');
@@ -2947,7 +3273,7 @@ normalizeCategories(currentGenre().categories);if(!data.activeCategoryId)data.ac
 })();
 
 
-/* TEST v6.13.0: isolated, per-channel scratchpad edit history.
+/* TEST v6.14.0: isolated, per-channel scratchpad edit history.
    Does not touch the category or formatted-memo history. */
 const SCRATCH_HISTORY_LIMIT=90;
 const scratchHistories=new Map();
