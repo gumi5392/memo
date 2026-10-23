@@ -562,7 +562,7 @@ body[data-theme="dark"] .create-name-modal .create-name-error{color:#ff9499}
   .app>.main>.memo-workspace>.scratch-panel .scratch-content{padding:14px 15px calc(22px + env(safe-area-inset-bottom))}
   .app>.main>.memo-workspace>.memo-column>.editor-wrap{padding-top:14px}
 }
-/* TEST v6.14.3: independent memo edit history buttons. */
+/* TEST v6.14.4: independent memo edit history buttons. */
 .memo-history-btn{min-width:35px;font-family:Arial,sans-serif!important;font-size:23px!important;font-weight:650;line-height:1!important;padding:4px 7px!important}
 .memo-history-btn:disabled{opacity:.38;cursor:not-allowed!important}
 .memo-history-btn:not(:disabled):hover{background:var(--hover)!important}
@@ -787,7 +787,7 @@ body[data-theme="dark"] .create-name-modal .create-name-error{color:#ff9499}
       <button class="theme-option dark" id="themeDark"><span class="preview"><span class="p-side"></span><span class="p-main"></span></span><strong>ダーク</strong><span>これまでの配色</span></button>
     </div>
     <div class="app-update-settings" aria-live="polite">
-      <div class="app-update-heading"><strong>アプリの更新</strong><span id="appBuildLabel">v6.14.3</span></div>
+      <div class="app-update-heading"><strong>アプリの更新</strong><span id="appBuildLabel">v6.14.4</span></div>
       <p id="appUpdateStatus">更新情報を確認しています…</p>
       <div class="app-update-actions">
         <button type="button" id="appCheckUpdate">更新を確認</button>
@@ -1004,7 +1004,7 @@ let data;
 try{data=JSON.parse(localStorage.getItem(KEY))||structuredClone(defaultData)}catch(e){data=structuredClone(defaultData)}
 let selectedIcon="🎮", pendingImage=null;
 
-// TEST v6.14.3: Keep large notebook/unsent edits outside the small, shared
+// TEST v6.14.4: Keep large notebook/unsent edits outside the small, shared
 // localStorage quota. IndexedDB writes are real transactions; do not report a
 // successful device save until the transaction has committed.
 const DEVICE_DB_NAME='chromeMemoTESTDeviceV6142';
@@ -1267,7 +1267,7 @@ function renderCategories(){
     if(cat.open){
       const inner=document.createElement("div");inner.className="cat-children";
       const notes=document.createElement("div");notes.className="notes";
-      cat.notes.forEach((n,ni)=>{const el=document.createElement("div");el.className="note"+(cat.id===data.activeCategoryId&&ni===data.activeNoteIndex?" active":"");el.innerHTML=`<span class="hash">#</span><span style="overflow:hidden;text-overflow:ellipsis">${esc(n.title)}</span>`;el.onclick=()=>{saveCurrent();data.activeCategoryId=cat.id;data.activeNoteIndex=ni;data.active=[0,0];save();loadNote();renderCategories()};el.ondblclick=e=>{e.stopPropagation();openNoteMenu(e.clientX,e.clientY,cat.id,ni)};el.draggable=true;el.ondragstart=e=>{dragNote={cat:cat.id,ni};el.classList.add("dragging")};el.ondragover=e=>{if(dragNote&&dragNote.cat===cat.id){e.preventDefault();el.classList.add("drop-target")}};el.ondragleave=()=>el.classList.remove("drop-target");el.ondrop=e=>{e.preventDefault();el.classList.remove("drop-target");if(dragNote&&dragNote.cat===cat.id)moveNoteById(cat.id,dragNote.ni,ni)};el.ondragend=()=>{dragNote=null;document.querySelectorAll(".note").forEach(x=>x.classList.remove("dragging","drop-target"))};notes.appendChild(el)});
+      cat.notes.forEach((n,ni)=>{const el=document.createElement("div");el.className="note"+(cat.id===data.activeCategoryId&&ni===data.activeNoteIndex?" active":"");el.innerHTML=`<span class="hash">#</span><span style="overflow:hidden;text-overflow:ellipsis">${esc(n.title)}</span>`;el.onclick=()=>{closeAllMenus();saveCurrent();data.activeCategoryId=cat.id;data.activeNoteIndex=ni;data.active=[0,0];save();loadNote();renderCategories()};el.ondblclick=e=>{if(window.matchMedia('(max-width:800px)').matches){e.preventDefault();e.stopPropagation();closeAllMenus();return;}e.stopPropagation();openNoteMenu(e.clientX,e.clientY,cat.id,ni)};el.draggable=true;el.ondragstart=e=>{dragNote={cat:cat.id,ni};el.classList.add("dragging")};el.ondragover=e=>{if(dragNote&&dragNote.cat===cat.id){e.preventDefault();el.classList.add("drop-target")}};el.ondragleave=()=>el.classList.remove("drop-target");el.ondrop=e=>{e.preventDefault();el.classList.remove("drop-target");if(dragNote&&dragNote.cat===cat.id)moveNoteById(cat.id,dragNote.ni,ni)};el.ondragend=()=>{dragNote=null;document.querySelectorAll(".note").forEach(x=>x.classList.remove("dragging","drop-target"))};notes.appendChild(el)});
       inner.appendChild(notes);
       cat.children.forEach(ch=>inner.appendChild(renderCat(ch)));
       wrap.appendChild(inner);
@@ -3140,6 +3140,13 @@ normalizeCategories(currentGenre().categories);if(!data.activeCategoryId)data.ac
       setView('memo');
       doubleSlideTimer=setTimeout(()=>{doubleSlideTimer=null;setView('list')},205);
     };
+    // Mobile: double-tapping a category or channel must never open the
+    // desktop channel edit/delete popup. Keep desktop double-click intact.
+    document.getElementById('categories').addEventListener('dblclick',e=>{
+      if(!mobile() || !e.target.closest('.cat-head,.note'))return;
+      e.preventDefault();e.stopImmediatePropagation();
+      closeAllMenus();
+    },true);
     document.getElementById('categories').addEventListener('click',e=>{
       if(mobile() && e.target.closest('.note') && performance.now()>=blockNextClickUntil)setView('memo');
     });
@@ -3221,7 +3228,7 @@ normalizeCategories(currentGenre().categories);if(!data.activeCategoryId)data.ac
 /* v6.5: PWA update detection + user-initiated safe refresh. */
 (function(){
  'use strict';
- const INSTALLED_BUILD='6.14.3';
+ const INSTALLED_BUILD='6.14.4';
  const intervalMs=10*60*1000;
  const status=document.getElementById('appUpdateStatus');
  const buildLabel=document.getElementById('appBuildLabel');
