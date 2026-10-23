@@ -562,7 +562,7 @@ body[data-theme="dark"] .create-name-modal .create-name-error{color:#ff9499}
   .app>.main>.memo-workspace>.scratch-panel .scratch-content{padding:14px 15px calc(22px + env(safe-area-inset-bottom))}
   .app>.main>.memo-workspace>.memo-column>.editor-wrap{padding-top:14px}
 }
-/* TEST v6.14.2: independent memo edit history buttons. */
+/* TEST v6.14.3: independent memo edit history buttons. */
 .memo-history-btn{min-width:35px;font-family:Arial,sans-serif!important;font-size:23px!important;font-weight:650;line-height:1!important;padding:4px 7px!important}
 .memo-history-btn:disabled{opacity:.38;cursor:not-allowed!important}
 .memo-history-btn:not(:disabled):hover{background:var(--hover)!important}
@@ -739,7 +739,7 @@ body[data-theme="dark"] .create-name-modal .create-name-error{color:#ff9499}
   <div class="modal">
     <h2 id="genreModalTitle">メモを追加</h2>
     <label id="genreNameLabel">メモ名</label>
-    <input type="text" id="genreName" placeholder="例：スト6">
+    <input type="text" id="genreName" placeholder="">
     <label>アイコン</label>
     <div class="icon-options" id="iconOptions"></div>
     <label>アイコンの背景色</label>
@@ -787,7 +787,7 @@ body[data-theme="dark"] .create-name-modal .create-name-error{color:#ff9499}
       <button class="theme-option dark" id="themeDark"><span class="preview"><span class="p-side"></span><span class="p-main"></span></span><strong>ダーク</strong><span>これまでの配色</span></button>
     </div>
     <div class="app-update-settings" aria-live="polite">
-      <div class="app-update-heading"><strong>アプリの更新</strong><span id="appBuildLabel">v6.14.2</span></div>
+      <div class="app-update-heading"><strong>アプリの更新</strong><span id="appBuildLabel">v6.14.3</span></div>
       <p id="appUpdateStatus">更新情報を確認しています…</p>
       <div class="app-update-actions">
         <button type="button" id="appCheckUpdate">更新を確認</button>
@@ -827,7 +827,7 @@ body[data-theme="dark"] .create-name-modal .create-name-error{color:#ff9499}
     <h2 id="createNameTitle">カテゴリーを追加</h2>
     <p id="createNameDescription" class="create-name-description">名前を入力してから作成します。</p>
     <label for="createNameInput" id="createNameLabel">カテゴリー名</label>
-    <input type="text" id="createNameInput" placeholder="カテゴリー名" autocomplete="off" maxlength="100" aria-describedby="createNameError">
+    <input type="text" id="createNameInput" placeholder="" autocomplete="off" maxlength="100" aria-describedby="createNameError">
     <p class="create-name-error" id="createNameError" role="status" aria-live="polite"></p>
     <div class="modal-actions">
       <button type="button" id="createNameCancel">キャンセル</button>
@@ -1004,7 +1004,7 @@ let data;
 try{data=JSON.parse(localStorage.getItem(KEY))||structuredClone(defaultData)}catch(e){data=structuredClone(defaultData)}
 let selectedIcon="🎮", pendingImage=null;
 
-// TEST v6.14.2: Keep large notebook/unsent edits outside the small, shared
+// TEST v6.14.3: Keep large notebook/unsent edits outside the small, shared
 // localStorage quota. IndexedDB writes are real transactions; do not report a
 // successful device save until the transaction has committed.
 const DEVICE_DB_NAME='chromeMemoTESTDeviceV6142';
@@ -1510,7 +1510,7 @@ function openCreateNameModal(kind, placement='root', categoryId=null){
   document.getElementById('createNameTitle').textContent=title;
   document.getElementById('createNameDescription').textContent=desc;
   document.getElementById('createNameLabel').textContent=kind==='channel'?'チャンネル名':'カテゴリー名';
-  input.placeholder=kind==='channel'?'例：イングリッド':'例：キャラ対';
+  input.placeholder='';
   input.value='';
   input.removeAttribute('aria-invalid');
   error.textContent='';
@@ -3221,7 +3221,7 @@ normalizeCategories(currentGenre().categories);if(!data.activeCategoryId)data.ac
 /* v6.5: PWA update detection + user-initiated safe refresh. */
 (function(){
  'use strict';
- const INSTALLED_BUILD='6.14.2';
+ const INSTALLED_BUILD='6.14.3';
  const intervalMs=10*60*1000;
  const status=document.getElementById('appUpdateStatus');
  const buildLabel=document.getElementById('appBuildLabel');
