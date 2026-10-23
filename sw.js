@@ -1,5 +1,5 @@
-/* Production memo app: network-first navigation, v6.15.0 */
-const MEMO_SW_BUILD='6.15.0-stable';
+/* Production memo app: network-first navigation, v6.15.1 */
+const MEMO_SW_BUILD='6.15.1-stable';
 self.addEventListener('install',event=>{event.waitUntil(self.skipWaiting())});
 self.addEventListener('activate',event=>{event.waitUntil((async()=>{
  const keys=await caches.keys();
