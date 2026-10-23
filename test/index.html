@@ -562,7 +562,7 @@ body[data-theme="dark"] .create-name-modal .create-name-error{color:#ff9499}
   .app>.main>.memo-workspace>.scratch-panel .scratch-content{padding:14px 15px calc(22px + env(safe-area-inset-bottom))}
   .app>.main>.memo-workspace>.memo-column>.editor-wrap{padding-top:14px}
 }
-/* TEST v6.14.1: independent memo edit history buttons. */
+/* TEST v6.14.2: independent memo edit history buttons. */
 .memo-history-btn{min-width:35px;font-family:Arial,sans-serif!important;font-size:23px!important;font-weight:650;line-height:1!important;padding:4px 7px!important}
 .memo-history-btn:disabled{opacity:.38;cursor:not-allowed!important}
 .memo-history-btn:not(:disabled):hover{background:var(--hover)!important}
@@ -787,7 +787,7 @@ body[data-theme="dark"] .create-name-modal .create-name-error{color:#ff9499}
       <button class="theme-option dark" id="themeDark"><span class="preview"><span class="p-side"></span><span class="p-main"></span></span><strong>ダーク</strong><span>これまでの配色</span></button>
     </div>
     <div class="app-update-settings" aria-live="polite">
-      <div class="app-update-heading"><strong>アプリの更新</strong><span id="appBuildLabel">v6.14.1</span></div>
+      <div class="app-update-heading"><strong>アプリの更新</strong><span id="appBuildLabel">v6.14.2</span></div>
       <p id="appUpdateStatus">更新情報を確認しています…</p>
       <div class="app-update-actions">
         <button type="button" id="appCheckUpdate">更新を確認</button>
@@ -1004,26 +1004,117 @@ let data;
 try{data=JSON.parse(localStorage.getItem(KEY))||structuredClone(defaultData)}catch(e){data=structuredClone(defaultData)}
 let selectedIcon="🎮", pendingImage=null;
 
-// TEST v6.14.1: quota errors must never abort a menu action or a click handler.
-// The UI is updated in memory; v6.14's cloud queue will still be notified.
-// The old backup, if present, is retained but no longer rewritten every edit:
-// repeatedly duplicating the whole notebook unnecessarily exhausted storage.
-let localMemoSaveError=false;
-function save(){
-  let written=false;
-  try{
-    localStorage.setItem(KEY,JSON.stringify(data));
-    written=true;
-    localMemoSaveError=false;
-  }catch(error){
-    localMemoSaveError=true;
-    console.warn('メモ帳の端末内保存に失敗:',error);
+// TEST v6.14.2: Keep large notebook/unsent edits outside the small, shared
+// localStorage quota. IndexedDB writes are real transactions; do not report a
+// successful device save until the transaction has committed.
+const DEVICE_DB_NAME='chromeMemoTESTDeviceV6142';
+const DEVICE_STORE='records';
+let deviceDBPromise=null;
+function openDeviceDB(){
+  if(deviceDBPromise)return deviceDBPromise;
+  deviceDBPromise=new Promise((resolve,reject)=>{
+    if(!window.indexedDB){reject(new Error('このブラウザではIndexedDBを利用できません'));return;}
+    let request;
+    try{request=indexedDB.open(DEVICE_DB_NAME,1)}catch(e){reject(e);return}
+    request.onupgradeneeded=()=>{
+      const db=request.result;if(!db.objectStoreNames.contains(DEVICE_STORE))db.createObjectStore(DEVICE_STORE);
+    };
+    request.onsuccess=()=>resolve(request.result);
+    request.onerror=()=>reject(request.error||new Error('端末保存領域に接続できません'));
+    request.onblocked=()=>reject(new Error('別のタブが保存領域の更新を妨げています'));
+  }).catch(e=>{deviceDBPromise=null;throw e});
+  return deviceDBPromise;
+}
+async function deviceRead(key){
+ const db=await openDeviceDB();
+ return new Promise((resolve,reject)=>{
+  const tx=db.transaction(DEVICE_STORE,'readonly'),req=tx.objectStore(DEVICE_STORE).get(key);
+  req.onsuccess=()=>resolve(req.result);
+  req.onerror=()=>reject(req.error||new Error('端末データを読み込めません'));
+  tx.onabort=()=>reject(tx.error||new Error('端末データの読み込みが中断されました'));
+ });
+}
+async function deviceWrite(key,value){
+ const db=await openDeviceDB();
+ return new Promise((resolve,reject)=>{
+  const tx=db.transaction(DEVICE_STORE,'readwrite');
+  tx.objectStore(DEVICE_STORE).put(value,key);
+  tx.oncomplete=()=>resolve(true); // Request success alone is NOT durable.
+  tx.onerror=()=>reject(tx.error||new Error('端末への保存に失敗しました'));
+  tx.onabort=()=>reject(tx.error||new Error('端末への保存が中断されました'));
+ });
+}
+const DEVICE_NOTEBOOK_KEY='notebook';
+let localMemoSaveError=false,localMemoSaveReason='';
+let localSaveSequence=0, localCacheQueued=null, localSavePendingCount=0;
+let deviceStartupReady=Promise.resolve();
+function safeRemoveLegacyKey(key){try{localStorage.removeItem(key)}catch(e){}}
+function describeStorageError(error){
+ if(error?.name==='QuotaExceededError'||error?.name==='NS_ERROR_DOM_QUOTA_REACHED')return '保存容量が不足しています';
+ if(error?.name==='SecurityError'||error?.name==='InvalidStateError')return '保存領域の利用が制限されています';
+ return '端末内の保存に失敗しました';
+}
+function storageUiUpdated(){
+ if(typeof sharedEnabled!=='undefined' && sharedEnabled){updateSyncLabel();return;}
+ const label=document.getElementById('saveState');
+ if(label)label.textContent=localMemoSaveError?'端末保存エラー：文章をコピーしてください':localSavePendingCount?'端末に保存中…':'端末に保存済み';
+}
+// Called by the existing synchronous UI handlers. Its I/O is deliberately
+// asynchronous, but failure never interrupts taps, menus, or text editing.
+function persistNotebook(){
+ let serialized;
+ try{serialized=JSON.stringify(data)}catch(e){localMemoSaveError=true;storageUiUpdated();return false;}
+ if(serialized===localCacheQueued && !localMemoSaveError)return true;
+ localCacheQueued=serialized;
+ const sequence=++localSaveSequence;
+ localSavePendingCount++;
+ storageUiUpdated();
+ deviceWrite(DEVICE_NOTEBOOK_KEY,serialized).then(()=>{
+   // Remove only the successfully migrated TEST notebook cache, never a stable key.
+   if(sequence===localSaveSequence){safeRemoveLegacyKey(KEY);localMemoSaveError=false;localMemoSaveReason='';}
+ }).catch(error=>{
+   if(sequence!==localSaveSequence)return;
+   let fallback=false;
+   let fallbackError=error;
+   try{localStorage.setItem(KEY,serialized);fallback=true}catch(e){fallbackError=e;console.warn(describeStorageError(e),e)}
+   localMemoSaveError=!fallback;localMemoSaveReason=fallback?'':describeStorageError(fallbackError);
+   if(!fallback)console.warn('IndexedDB と localStorage への保存に失敗:',error);
+ }).finally(()=>{localSavePendingCount=Math.max(0,localSavePendingCount-1);storageUiUpdated()});
+ return true;
+}
+function save(){return persistNotebook()}
+
+// Import only known TEST-version large keys, and remove each old source ONLY
+// after IndexedDB has committed the same bytes. Stable app keys are untouched.
+async function migrateOldTestStorage(){
+  let cache;
+  try{cache=await deviceRead(DEVICE_NOTEBOOK_KEY)}catch(e){return}
+  const oldNotebook=(()=>{try{return localStorage.getItem(KEY)}catch(e){return null}})();
+  if(cache && !oldNotebook){
+    try{data=JSON.parse(cache)||data}catch(e){console.warn('端末キャッシュを復元できません:',e)}
+  }else if(oldNotebook){
+    if(!cache){
+      try{await deviceWrite(DEVICE_NOTEBOOK_KEY,oldNotebook)}catch(e){return}
+    }else if(cache!==oldNotebook){
+      // Preserve differing legacy content rather than choosing one silently.
+      try{await deviceWrite('legacy-notebook',oldNotebook)}catch(e){return}
+      try{data=JSON.parse(cache)||data}catch(e){}
+    }
+    safeRemoveLegacyKey(KEY);
   }
-  const label=document.getElementById('saveState');
-  if(label)label.textContent=written
-    ?'端末に保存 '+new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})
-    :'端末保存エラー（文章をコピー）';
-  return written;
+  const keys=[];
+  try{
+    for(let i=0;i<localStorage.length;i++){
+      const k=localStorage.key(i);
+      if(k&&(k===KEY+'_categoryHistoryV2'||k.startsWith('chromeMemoTESTBeforeV614_')||k.startsWith('chromeMemoTESTRescueV614_')))keys.push(k);
+    }
+  }catch(e){return}
+  for(const k of keys){
+    try{
+      const v=localStorage.getItem(k);if(v===null)continue;
+      await deviceWrite('legacy:'+k,v);safeRemoveLegacyKey(k);
+    }catch(e){console.warn('古いテスト用データの移行を保留:',k,e)}
+  }
 }
 function currentGenre(){return data.genres[data.activeGenre]}
 function currentCat(){ensureCategoryState();return findCategory(data.activeCategoryId)}
@@ -1505,19 +1596,12 @@ document.getElementById('createNameInput').addEventListener('keydown',e=>{
    independent of memo body/title/scratch edits and of other memo groups. */
 const CATEGORY_UNDO_KEY=KEY+'_categoryHistoryV2';
 const CATEGORY_HISTORY_LIMIT=25;
-function readCategoryHistory(){
-  try{
-    const saved=JSON.parse(localStorage.getItem(CATEGORY_UNDO_KEY)||'{}');
-    return saved && typeof saved==='object' && !Array.isArray(saved) ? saved : {};
-  }catch(e){return {}}
-}
-function writeCategoryHistory(all){
-  try{localStorage.setItem(CATEGORY_UNDO_KEY,JSON.stringify(all));updateCategoryHistoryButtons();return true}
-  catch(e){openInfoModal('操作履歴を端末に保存できませんでした。ストレージの空き容量を確認してください。','履歴の保存に失敗');return false}
-}
-function clearCategoryHistories(){
-  try{localStorage.removeItem(CATEGORY_UNDO_KEY)}catch(e){}
-}
+// Category undo/redo is session-local and is cleared when cloud data is loaded.
+// It must not duplicate whole category trees into the small localStorage quota.
+let categoryHistoryCache={};
+function readCategoryHistory(){return categoryHistoryCache}
+function writeCategoryHistory(all){categoryHistoryCache=all;updateCategoryHistoryButtons();return true}
+function clearCategoryHistories(){categoryHistoryCache={};safeRemoveLegacyKey(CATEGORY_UNDO_KEY)}
 function categoryHistoryGenreId(){
   const g=currentGenre();if(g&&!g.id)g.id=crypto.randomUUID();return g?.id||null;
 }
@@ -2277,21 +2361,43 @@ function currentDoc(id){
 }
 function pendingStorageKey(){return PENDING_PREFIX+(syncSession?.user?.id||'unknown')}
 function rescueStorageKey(){return RESCUE_PREFIX+(syncSession?.user?.id||'unknown')}
+let pendingSaveSequence=0,pendingSaveCount=0,lastPendingQueued=null,sharedSavingReason='';
+function pendingDeviceKey(){return 'pending:'+ (syncSession?.user?.id||'unknown')}
 function writePending(){
-  try{localStorage.setItem(pendingStorageKey(),JSON.stringify(Object.fromEntries(pendingDrafts)));return true}
-  catch(e){sharedSavingError=true;showSharedStatus('重要：端末内の未同期データを保存できません（容量不足）。文章をコピーしてください');return false}
+  const snapshot=JSON.stringify(Object.fromEntries(pendingDrafts));
+  if(snapshot===lastPendingQueued && !sharedSavingError)return true;
+  const seq=++pendingSaveSequence;
+  lastPendingQueued=snapshot;pendingSaveCount++;
+  deviceWrite(pendingDeviceKey(),snapshot).then(()=>{
+    if(seq===pendingSaveSequence){safeRemoveLegacyKey(pendingStorageKey());sharedSavingError=false;sharedSavingReason='';}
+  }).catch(error=>{
+    if(seq!==pendingSaveSequence)return;
+    let fallback=false;
+    let fallbackError=error;
+    try{localStorage.setItem(pendingStorageKey(),snapshot);fallback=true}catch(e){fallbackError=e;console.warn(describeStorageError(e),e)}
+    sharedSavingError=!fallback;sharedSavingReason=fallback?'':describeStorageError(fallbackError);
+    if(!fallback)console.warn('未同期データの保存失敗:',error);
+  }).finally(()=>{pendingSaveCount=Math.max(0,pendingSaveCount-1);updateSyncLabel()});
+  return true;
 }
-function recoverPending(){
-  let drafts={};try{drafts=JSON.parse(localStorage.getItem(pendingStorageKey())||'{}')||{}}catch(e){}
-  pendingDrafts=new Map(Object.entries(drafts));
+async function recoverPending(){
+  const key=pendingStorageKey();let dbText=null,legacyText=null;
+  try{dbText=await deviceRead(pendingDeviceKey())}catch(e){console.warn('IndexedDBの未同期データを読み込めません:',e)}
+  try{legacyText=localStorage.getItem(key)}catch(e){}
+  const parse=s=>{try{const v=JSON.parse(s||'{}');return v&&typeof v==='object'&&!Array.isArray(v)?v:{}}catch(e){return {}}};
+  // If a failed IndexedDB write fell back to localStorage, those newer drafts
+  // take precedence. Do not discard older IDB drafts for OTHER channels.
+  pendingDrafts=new Map(Object.entries({...parse(dbText),...parse(legacyText)}));
+  lastPendingQueued=null;
+  if(legacyText!==null)writePending();
 }
 function backupConflict(id,local,remote){
-  try{
-    const key=rescueStorageKey(),records=JSON.parse(localStorage.getItem(key)||'[]');
+  const key='rescue:'+(syncSession?.user?.id||'unknown');
+  (async()=>{
+    const records=await deviceRead(key)||[];
     records.push({date:new Date().toISOString(),id,local,remote});
-    // Keep 25 past choices so an accidental selection is not irrecoverable.
-    localStorage.setItem(key,JSON.stringify(records.slice(-25)));
-  }catch(e){showSharedStatus('履歴の退避に失敗しました。端末版を別の場所へコピーしてください');}
+    await deviceWrite(key,records.slice(-25));
+  })().catch(e=>showSharedStatus('競合の退避に失敗しました。両方の文章を別の場所にコピーしてください'));
 }
 function setBaseline(id,row){
   sharedVersions.set(id,row.version);
@@ -2314,12 +2420,13 @@ function markPending(id,payload){
 }
 function updateSyncLabel(){
   cloudDirty=sharedDirty.size>0;
-  if(sharedSavingError||localMemoSaveError){showSharedStatus('端末保存エラー：書いた内容を別の場所にコピーしてください');return}
+  if(sharedSavingError||localMemoSaveError){showSharedStatus('端末保存エラー：'+(localMemoSaveError?localMemoSaveReason:sharedSavingReason)+'。文章をコピーしてください');return}
   if(sharedConflict.size){showSharedStatus('競合 '+sharedConflict.size+'件：タップして内容を確認');return}
   if(!navigator.onLine && sharedDirty.size){showSharedStatus('オフライン：端末に未同期の変更あり');return}
   if(sharedDirty.size){showSharedStatus(sharedBusy?'クラウドへ保存中…':'未同期 '+sharedDirty.size+'件（端末に保存）');return}
   if(sharedBusy){showSharedStatus('クラウドへ保存中…');return}
   if(!sharedEnabled){showSharedStatus('クラウド未接続');return}
+  if(localSavePendingCount||pendingSaveCount){showSharedStatus('端末へ保存中…');return}
   showSharedStatus('クラウド同期完了');
 }
 function detectSharedChanges(){
@@ -2445,13 +2552,9 @@ async function startShared(announce){
   if(!syncSession)return;
   const epoch=++sharedInitialEpoch;
   try{
-    // When a browser is upgraded from older versions, retain an emergency copy
-    // before applying the cloud snapshot. This is not used for blind cloud writes.
-    const legacyKey=LEGACY_RESCUE_PREFIX+syncSession.user.id;
-    if(!localStorage.getItem(legacyKey)){
-      try{localStorage.setItem(legacyKey,JSON.stringify({time:new Date().toISOString(),data}))}catch(e){}
-    }
-    recoverPending();
+    // The local cache migration must finish before loading durable unsent drafts.
+    await deviceStartupReady;
+    await recoverPending();
     const rows=await fetchSharedRows();if(epoch!==sharedInitialEpoch)return;
     if(!rows.has('structure')){
       sharedEnabled=false;
@@ -2472,16 +2575,9 @@ async function startShared(announce){
   }catch(e){showSharedStatus('共有メモ接続失敗：'+e.message)}
 }
 function localSaveOnly(){
-  // This is called after receiving cloud data. Storage failure should be
-  // reported, not misclassified as a failure of the pending-draft queue.
-  try{
-    localStorage.setItem(KEY,JSON.stringify(data));
-    localMemoSaveError=false;
-  }catch(error){
-    localMemoSaveError=true;
-    console.warn('同期内容の端末内保存に失敗:',error);
-    showSharedStatus('端末保存エラー：文章を別の場所にコピーしてください');
-  }
+  // A cloud pull must never replicate the whole notebook in localStorage.
+  // IndexedDB save failures are reported asynchronously, without blocking taps.
+  persistNotebook();
 }
 async function initializeShared(){
  // First-device bootstrap ONLY reads the stable table and writes test records.
@@ -2759,7 +2855,9 @@ if('serviceWorker' in navigator){
    navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{});
  });
 }
-normalizeCategories(currentGenre().categories);if(!data.activeCategoryId)data.activeCategoryId=currentGenre().categories[0]?.id;data.activeNoteIndex=data.activeNoteIndex??data.active[1]??0;assignIds();_localSave();setupResize();renderAll();loadNote();
+// Prepare the IndexedDB migration without overwriting a newer cache with defaults.
+deviceStartupReady=migrateOldTestStorage().catch(e=>console.warn('端末データの移行を保留:',e));
+normalizeCategories(currentGenre().categories);if(!data.activeCategoryId)data.activeCategoryId=currentGenre().categories[0]?.id;data.activeNoteIndex=data.activeNoteIndex??data.active[1]??0;assignIds();setupResize();renderAll();loadNote();
 
 
 /* TEST v6.11.1: fully closable desktop 雑メモ with persistent, draggable width. */
@@ -3123,7 +3221,7 @@ normalizeCategories(currentGenre().categories);if(!data.activeCategoryId)data.ac
 /* v6.5: PWA update detection + user-initiated safe refresh. */
 (function(){
  'use strict';
- const INSTALLED_BUILD='6.14.1';
+ const INSTALLED_BUILD='6.14.2';
  const intervalMs=10*60*1000;
  const status=document.getElementById('appUpdateStatus');
  const buildLabel=document.getElementById('appBuildLabel');
