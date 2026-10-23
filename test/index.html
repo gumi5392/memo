@@ -562,7 +562,7 @@ body[data-theme="dark"] .create-name-modal .create-name-error{color:#ff9499}
   .app>.main>.memo-workspace>.scratch-panel .scratch-content{padding:14px 15px calc(22px + env(safe-area-inset-bottom))}
   .app>.main>.memo-workspace>.memo-column>.editor-wrap{padding-top:14px}
 }
-/* TEST v6.14.5: independent memo edit history buttons. */
+/* TEST v6.14.6: independent memo edit history buttons. */
 .memo-history-btn{min-width:35px;font-family:Arial,sans-serif!important;font-size:23px!important;font-weight:650;line-height:1!important;padding:4px 7px!important}
 .memo-history-btn:disabled{opacity:.38;cursor:not-allowed!important}
 .memo-history-btn:not(:disabled):hover{background:var(--hover)!important}
@@ -613,7 +613,7 @@ body[data-theme="dark"] .create-name-modal .create-name-error{color:#ff9499}
 .conflict-warning{color:var(--muted)}.conflict-actions{flex-wrap:wrap}
 @media(max-width:600px){.conflict-sides{grid-template-columns:1fr}.conflict-sides textarea{height:115px}.conflict-panel{padding:14px}}
 
-/* v6.14.5: sortable icons and touch-safe rearranging. */
+/* v6.14.6: sortable icons and touch-safe rearranging. */
 #genres .server.sort-dragging,.cat-head.sort-dragging,.note.sort-dragging{opacity:.52}
 #genres .server.drop-target,.cat-head.drop-target,.note.drop-target{outline:2px dashed var(--accent);outline-offset:-2px}
 body.mobile-sort-active .servers .server,body.mobile-sort-active .cat-head,body.mobile-sort-active .note{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
@@ -797,7 +797,7 @@ body.mobile-sort-active .app>.sidebar .sidebar-body,body.mobile-sort-active .app
       <button class="theme-option dark" id="themeDark"><span class="preview"><span class="p-side"></span><span class="p-main"></span></span><strong>ダーク</strong><span>これまでの配色</span></button>
     </div>
     <div class="app-update-settings" aria-live="polite">
-      <div class="app-update-heading"><strong>アプリの更新</strong><span id="appBuildLabel">v6.14.5</span></div>
+      <div class="app-update-heading"><strong>アプリの更新</strong><span id="appBuildLabel">v6.14.6</span></div>
       <p id="appUpdateStatus">更新情報を確認しています…</p>
       <div class="app-update-actions">
         <button type="button" id="appCheckUpdate">更新を確認</button>
@@ -1014,7 +1014,7 @@ let data;
 try{data=JSON.parse(localStorage.getItem(KEY))||structuredClone(defaultData)}catch(e){data=structuredClone(defaultData)}
 let selectedIcon="🎮", pendingImage=null;
 
-// TEST v6.14.5: Keep large notebook/unsent edits outside the small, shared
+// TEST v6.14.6: Keep large notebook/unsent edits outside the small, shared
 // localStorage quota. IndexedDB writes are real transactions; do not report a
 // successful device save until the transaction has committed.
 const DEVICE_DB_NAME='chromeMemoTESTDeviceV6142';
@@ -3282,7 +3282,7 @@ normalizeCategories(currentGenre().categories);if(!data.activeCategoryId)data.ac
 /* v6.5: PWA update detection + user-initiated safe refresh. */
 (function(){
  'use strict';
- const INSTALLED_BUILD='6.14.5';
+ const INSTALLED_BUILD='6.14.6';
  const intervalMs=10*60*1000;
  const status=document.getElementById('appUpdateStatus');
  const buildLabel=document.getElementById('appBuildLabel');
@@ -3545,8 +3545,8 @@ document.addEventListener('keydown',e=>{
 },true);
 alignScratchHistory();
 
-/* v6.14.5: mobile long-press sorting (icons / categories / channels).
-   Hold ≈500ms before moving. Normal taps, vertical scroll and horizontal
+/* v6.14.6: mobile long-press sorting (icons / categories / channels).
+   Hold ≈400ms before moving. Normal taps, vertical scroll and horizontal
    panel swipe work as before. Do not reinterpret category hierarchy on drop. */
 (function initMobileListSorting(){
   const iconRoot=document.getElementById('genres');
@@ -3620,7 +3620,7 @@ alignScratchHistory();
       document.body.classList.add('mobile-sort-active');
       if(navigator.vibrate)navigator.vibrate(10);
       autoScrollTimer=setInterval(scrollDuringDrag,36);
-    },500);
+    },400);
   },{capture:true,passive:true});
   document.addEventListener('touchmove',e=>{
     if(!candidate||e.touches.length!==1)return;
