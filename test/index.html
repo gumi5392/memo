@@ -622,6 +622,56 @@ body.mobile-sort-active .app>.sidebar .sidebar-body,body.mobile-sort-active .app
   #genres .server,.cat-head,.note{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-user-drag:none}
   #genres .server.sort-dragging,.cat-head.sort-dragging,.note.sort-dragging{filter:brightness(1.09);box-shadow:0 0 0 2px var(--accent) inset}
 }
+/* v6.14.7: Editable memo tables and desktop-only content rearrangement */
+.memo-insert-table-btn,.memo-move-mode-btn{white-space:nowrap}
+.memo-move-mode-btn[aria-pressed="true"]{background:#d0e7d6!important;border-color:#338f63!important;color:#125a3a!important}
+.memo-table{--memo-table-scale:1;position:relative;display:block;margin:14px 0 18px;width:640px;max-width:100%;vertical-align:top;user-select:text}
+.memo-table-frame{position:relative;border:1px solid #cbbfa8;border-radius:9px;overflow:hidden;background:#f4ecda}
+.memo-table table{width:100%;border-spacing:0;border-collapse:collapse;table-layout:fixed;line-height:1.5}
+.memo-table th,.memo-table td{position:relative;min-width:0;vertical-align:top;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;outline-offset:-2px;padding:calc(10px * var(--memo-table-scale));font-size:calc(14px * var(--memo-table-scale));border:1px solid #cfbea3;min-height:calc(38px * var(--memo-table-scale))}
+.memo-table th{background:#32935d;color:#fff;font-weight:700;text-align:left;border-color:#a1c4a4}
+.memo-table tbody tr:nth-child(odd) td{background:#f4eedf;color:#30271f}
+.memo-table tbody tr:nth-child(even) td{background:#eadfc6;color:#30271f}
+.memo-table td:focus,.memo-table th:focus{outline:2px solid #158a61}
+.memo-table-actions{display:flex;gap:7px;align-items:center;flex-wrap:wrap;min-height:40px;padding:7px 2px 0}
+.memo-table-actions button{background:var(--panel2);border:1px solid var(--line);color:var(--text);padding:6px 10px;border-radius:7px;font-size:12px;cursor:pointer}
+.memo-table-actions button:hover{background:var(--hover)}
+.memo-table-actions .table-remove{margin-left:auto;color:var(--danger);border-color:#bd918c;background:transparent}
+.memo-table-resize{position:absolute;right:-4px;bottom:-4px;width:15px;height:15px;border-radius:4px;background:var(--accent);border:2px solid #f5efe2;cursor:nwse-resize;z-index:4;touch-action:none}
+.memo-col-resizer{position:absolute;right:-5px;top:0;bottom:0;width:10px;z-index:4;cursor:col-resize;touch-action:none}
+.memo-col-resizer::after{content:'';position:absolute;right:4px;top:15%;height:70%;width:2px;background:#ffffff80}
+.memo-col-resizer:hover::after{width:4px;right:3px;background:#fff}
+.editor.memo-move-mode{padding-left:37px;cursor:default}
+.editor.memo-move-mode .memo-move-line,.editor.memo-move-mode .memo-table{position:relative;min-height:1.7em;cursor:grab}
+.editor.memo-move-mode .memo-move-line{margin:0;white-space:normal}
+.editor.memo-move-mode .memo-move-line[data-move-selected="1"],.editor.memo-move-mode .memo-table[data-move-selected="1"]{background:#d2e8d5;outline:1px solid #6aa985;border-radius:5px}
+.memo-move-handle{position:absolute;left:-34px;top:0;display:flex;align-items:center;justify-content:center;width:28px;height:29px;border-radius:6px;border:1px solid #c8bba6;background:#eee4d2;color:#565047;cursor:grab;user-select:none;touch-action:none;z-index:5;font-size:19px;line-height:1}
+.memo-move-handle:hover{background:#cfe5d6;color:#165d42;border-color:#69a587}
+.memo-drop-marker{height:3px;min-height:3px;border-radius:2px;background:#07845a;box-shadow:0 0 0 1px #fff;pointer-events:none;margin:3px 0;position:relative;z-index:8}
+.memo-drop-marker::before{content:'';position:absolute;left:-5px;top:-4px;width:10px;height:10px;background:#07845a;border-radius:50%}
+.memo-move-help{color:var(--muted);font-size:12px;line-height:1.5;margin-top:4px}
+.memo-table .memo-move-handle{top:2px}
+.editor.memo-move-mode .memo-table-actions,.editor.memo-move-mode .memo-col-resizer,.editor.memo-move-mode .memo-table-resize{display:none!important}
+body[data-theme="dark"] .memo-table-frame{border-color:#45504a;background:#222925}
+body[data-theme="dark"] .memo-table th{background:#176844;border-color:#407553}
+body[data-theme="dark"] .memo-table tbody tr:nth-child(odd) td{background:#2e332c;color:#e9e6db;border-color:#485044}
+body[data-theme="dark"] .memo-table tbody tr:nth-child(even) td{background:#363c32;color:#e9e6db;border-color:#485044}
+body[data-theme="dark"] .memo-move-handle{background:#343740;color:#e8e9ed;border-color:#555b58}
+body[data-theme="dark"] .editor.memo-move-mode [data-move-selected="1"]{background:#193c2e;outline-color:#388d67}
+@media(max-width:800px){
+  .memo-insert-table-btn,.memo-move-mode-btn,.memo-move-handle,.memo-col-resizer,.memo-table-resize{display:none!important}
+  .editor.memo-move-mode{padding-left:0}
+  .memo-table{width:100%!important;max-width:100%;margin:12px 0}
+  .memo-table th,.memo-table td{padding:7px;font-size:13px;min-width:0}
+  .memo-table-actions{gap:5px}.memo-table-actions button{padding:7px;font-size:11px}
+  .memo-table-actions .table-remove{margin-left:0}
+}
+
+#memoMoveTip[hidden]{display:none!important}
+#memoMoveTip{font-size:12px;color:#176548;background:#e0ecda;border:1px solid #c3dcc5;border-radius:8px;padding:9px 12px;margin:0 0 12px;line-height:1.55}
+body[data-theme="dark"] #memoMoveTip{background:#21362b;color:#bce0c7;border-color:#36684e}
+@media(max-width:800px){#memoMoveTip{display:none!important}}
+
 </style>
 </head>
 <body>
@@ -703,6 +753,8 @@ body.mobile-sort-active .app>.sidebar .sidebar-body,body.mobile-sort-active .app
           <button type="button" class="mobile-only" id="insertImageBtn">🖼 画像</button>
           <button type="button" class="mobile-only" id="insertVideoBtn">▶ 動画</button>
           <button type="button" class="desktop-only color-trigger" id="desktopColorBtn" aria-controls="desktopColorPalette" aria-expanded="false">色 ▾</button>
+          <button type="button" class="desktop-only memo-insert-table-btn" id="insertMemoTableBtn" title="メモ本文に編集可能な表を挿入する">▦ 表</button>
+          <button type="button" class="desktop-only memo-move-mode-btn" id="memoMoveModeBtn" aria-pressed="false" title="文章や表を並べ替える">⠿ 移動</button>
           <input type="file" id="imageInput" accept="image/*" hidden><input type="file" id="videoInput" accept="video/*" hidden>
         </div>
         <div class="desktop-color-palette" id="desktopColorPalette" hidden>
@@ -712,6 +764,7 @@ body.mobile-sort-active .app>.sidebar .sidebar-body,body.mobile-sort-active .app
         </div>
       </div>
       <input class="note-title" id="noteTitle" value="">
+      <div id="memoMoveTip" hidden>左のハンドルをドラッグして移動できます。複数行は最初の行をクリック → Shift＋最後の行をクリックして範囲を選択してください。</div>
       <div class="editor" id="editor" contenteditable="true" spellcheck="false"></div>
       <div class="hint">編集内容は端末内に保存されます。共有メモ接続中はチャンネル単位でクラウドにも自動保存されます。</div>
     </div>
@@ -3282,7 +3335,7 @@ normalizeCategories(currentGenre().categories);if(!data.activeCategoryId)data.ac
 /* v6.5: PWA update detection + user-initiated safe refresh. */
 (function(){
  'use strict';
- const INSTALLED_BUILD='6.14.6';
+ const INSTALLED_BUILD='6.14.7';
  const intervalMs=10*60*1000;
  const status=document.getElementById('appUpdateStatus');
  const buildLabel=document.getElementById('appBuildLabel');
@@ -3666,6 +3719,370 @@ alignScratchHistory();
       e.preventDefault();e.stopImmediatePropagation();
     }
   },true);
+})();
+
+/* v6.14.7: tables and move mode (test only).
+ * Tables are saved as native HTML, with UI widgets excluded from the snapshot.
+ * A move affects a complete DOM line or table block; original rich text stays in nodes.
+ */
+(function initMemoTableAndMove(){
+  const ed=document.getElementById('editor');
+  const insertBtn=document.getElementById('insertMemoTableBtn');
+  const modeBtn=document.getElementById('memoMoveModeBtn');
+  const moveTip=document.getElementById('memoMoveTip');
+  if(!ed||!insertBtn||!modeBtn)return;
+  const mobile=()=>window.matchMedia('(max-width:800px)').matches;
+  let mode=false,selected=new Set(),lastSelected=null,candidate=null,insertMarker=null,lastCaret=null,activeCell=null;
+  const units=()=>[...ed.children].filter(e=>e.classList.contains('memo-move-line')||e.classList.contains('memo-table'));
+  function cleanupTemporary(root){
+    root.querySelectorAll('.memo-table-ui,.memo-move-handle,.memo-drop-marker').forEach(el=>el.remove());
+    root.querySelectorAll('[data-move-selected]').forEach(el=>el.removeAttribute('data-move-selected'));
+    root.classList.remove('memo-move-mode');
+  }
+  // Preserve exact table text and rich-text styling, but not draggable UI controls.
+  const beforePlain=plainEditorHtml;
+  plainEditorHtml=function(){
+    const clone=ed.cloneNode(true);
+    cleanupTemporary(clone);
+    clone.querySelectorAll('.memo-channel-link').forEach(a=>a.replaceWith(document.createTextNode(a.textContent)));
+    return clone.innerHTML;
+  };
+  const beforeLoad=loadNote;
+  loadNote=function(){
+    selected.clear();lastSelected=null;candidate=null;
+    if(insertMarker){insertMarker.remove();insertMarker=null;}
+    beforeLoad();
+    enhanceTables();
+    if(mode&&!mobile()){normalizeLines();addMoveHandles();}
+  };
+  document.addEventListener('selectionchange',()=>{
+    if(mode)return;
+    const sel=window.getSelection();
+    if(sel&&sel.rangeCount&&ed.contains(sel.anchorNode))lastCaret=sel.getRangeAt(0).cloneRange();
+  });
+  ed.addEventListener('focusin',e=>{
+    if(e.target.closest?.('.memo-table th,.memo-table td'))activeCell=e.target;
+  });
+  function makeCell(tag){
+    const cell=document.createElement(tag);
+    cell.setAttribute('contenteditable','true');
+    cell.appendChild(document.createElement('br'));
+    return cell;
+  }
+  function makeTable(){
+    const wrap=document.createElement('div');wrap.className='memo-table';
+    wrap.setAttribute('contenteditable','false');wrap.dataset.baseWidth='640';wrap.dataset.scale='1';
+    const frame=document.createElement('div');frame.className='memo-table-frame';
+    const table=document.createElement('table');
+    const cols=document.createElement('colgroup');
+    [22,25,53].forEach(p=>{const col=document.createElement('col');col.style.width=p+'%';cols.appendChild(col);});
+    table.appendChild(cols);
+    const thead=document.createElement('thead'),tr=document.createElement('tr');
+    for(let i=0;i<3;i++)tr.appendChild(makeCell('th'));
+    thead.appendChild(tr);table.appendChild(thead);
+    const body=document.createElement('tbody');
+    for(let r=0;r<3;r++){
+      const row=document.createElement('tr');for(let c=0;c<3;c++)row.appendChild(makeCell('td'));
+      body.appendChild(row);
+    }
+    table.appendChild(body);frame.appendChild(table);wrap.appendChild(frame);
+    return wrap;
+  }
+  function applyTableScale(wrap){
+    const base=Math.max(360,Math.min(1200,Number(wrap.dataset.baseWidth)||640));
+    const scale=Math.max(.55,Math.min(1.6,Number(wrap.dataset.scale)||1));
+    wrap.dataset.baseWidth=String(base);wrap.dataset.scale=String(Math.round(scale*1000)/1000);
+    wrap.style.width=(base*scale)+'px';
+    wrap.style.setProperty('--memo-table-scale',String(scale));
+  }
+  function saveTableChange(kind){saveCurrent();recordMemoEdit(kind||'table');}
+  function addTableRow(wrap){
+    const t=wrap.querySelector('table'),cols=t.querySelectorAll('colgroup col').length;
+    const row=document.createElement('tr');for(let i=0;i<cols;i++)row.appendChild(makeCell('td'));
+    const source=activeCell?.closest('tr');
+    if(source&&source.closest('.memo-table')===wrap&&source.parentElement.tagName==='TBODY')source.after(row);
+    else t.tBodies[0].appendChild(row);
+    enhanceTables();saveTableChange('table-row');row.querySelector('td')?.focus();
+  }
+  function addTableColumn(wrap){
+    const t=wrap.querySelector('table'),cols=[...t.querySelectorAll('colgroup col')];
+    if(cols.length>=15){openInfoModal('列は最大15列まで追加できます。','列を追加できません');return;}
+    const fraction=100/(cols.length+1);
+    cols.forEach(c=>c.style.width=(Number.parseFloat(c.style.width)*(1-fraction/100))+'%');
+    const col=document.createElement('col');col.style.width=fraction+'%';t.querySelector('colgroup').appendChild(col);
+    t.querySelectorAll('tr').forEach((tr,i)=>tr.appendChild(makeCell(i===0?'th':'td')));
+    enhanceTables();saveTableChange('table-column');
+  }
+  function requestDeleteTable(wrap){
+    const rows=wrap.querySelectorAll('tbody tr').length,cols=wrap.querySelectorAll('thead th').length;
+    openConfirmModal(`この表（${cols}列 × ${rows+1}行）を削除します。\n\n※ 表に入力した文字、色、列幅などもすべて削除されます。\n削除対象を確認してください。`,()=>{
+      if(!wrap.isConnected)return;
+      wrap.remove();saveTableChange('table-delete');
+      if(mode)addMoveHandles();
+    },{title:'表の削除を確認',confirmLabel:'表を削除する'});
+  }
+  function addColumnResizers(wrap){
+    const t=wrap.querySelector('table');
+    const cols=[...t.querySelectorAll('colgroup col')],heads=[...t.querySelectorAll('thead th')];
+    heads.slice(0,-1).forEach((head,index)=>{
+      const h=document.createElement('span');h.className='memo-col-resizer memo-table-ui';
+      h.setAttribute('contenteditable','false');h.title='左右へドラッグして列幅を変更';head.appendChild(h);
+      h.addEventListener('pointerdown',e=>{
+        if(mode||mobile())return;
+        e.preventDefault();e.stopPropagation();
+        const total=t.getBoundingClientRect().width||640;
+        const first=parseFloat(cols[index].style.width),second=parseFloat(cols[index+1].style.width);
+        const x=e.clientX;
+        h.setPointerCapture?.(e.pointerId);
+        const move=ev=>{
+          const delta=100*(ev.clientX-x)/total;
+          const next=Math.max(8,Math.min(first+second-8,first+delta));
+          cols[index].style.width=next+'%';cols[index+1].style.width=(first+second-next)+'%';
+        };
+        const up=()=>{
+          h.removeEventListener('pointermove',move);h.removeEventListener('pointerup',up);
+          h.removeEventListener('pointercancel',up);saveTableChange('table-col-resize');
+        };
+        h.addEventListener('pointermove',move);h.addEventListener('pointerup',up);h.addEventListener('pointercancel',up);
+      });
+    });
+  }
+  function addSizeHandle(wrap){
+    const frame=wrap.querySelector('.memo-table-frame');if(!frame)return;
+    const handle=document.createElement('span');handle.className='memo-table-resize memo-table-ui';
+    handle.title='ドラッグで表全体を縦横同じ倍率で拡大・縮小';
+    handle.setAttribute('contenteditable','false');frame.appendChild(handle);
+    handle.addEventListener('pointerdown',e=>{
+      if(mode||mobile())return;
+      e.preventDefault();e.stopPropagation();
+      handle.setPointerCapture?.(e.pointerId);
+      const x=e.clientX,y=e.clientY,start=Number(wrap.dataset.scale)||1,base=Number(wrap.dataset.baseWidth)||640;
+      const move=ev=>{
+        const delta=((ev.clientX-x)+(ev.clientY-y)*.55)/base;
+        wrap.dataset.scale=String(Math.max(.55,Math.min(1.6,start+delta)));
+        applyTableScale(wrap);
+      };
+      const up=()=>{
+        handle.removeEventListener('pointermove',move);handle.removeEventListener('pointerup',up);
+        handle.removeEventListener('pointercancel',up);saveTableChange('table-scale');
+      };
+      handle.addEventListener('pointermove',move);handle.addEventListener('pointerup',up);handle.addEventListener('pointercancel',up);
+    });
+  }
+  function enhanceTables(){
+    ed.querySelectorAll('.memo-table').forEach(wrap=>{
+      wrap.querySelectorAll('.memo-table-ui').forEach(x=>x.remove());
+      wrap.setAttribute('contenteditable','false');
+      wrap.querySelectorAll('th,td').forEach(c=>c.setAttribute('contenteditable',mode?'false':'true'));
+      applyTableScale(wrap);
+      const actions=document.createElement('div');actions.className='memo-table-actions memo-table-ui';actions.setAttribute('contenteditable','false');
+      const row=document.createElement('button');row.type='button';row.textContent='＋ 行を追加';
+      const col=document.createElement('button');col.type='button';col.textContent='＋ 列を追加';
+      const del=document.createElement('button');del.type='button';del.className='table-remove';del.textContent='表を削除';
+      row.addEventListener('click',e=>{e.preventDefault();addTableRow(wrap)});
+      col.addEventListener('click',e=>{e.preventDefault();addTableColumn(wrap)});
+      del.addEventListener('click',e=>{e.preventDefault();requestDeleteTable(wrap)});
+      actions.append(row,col,del);wrap.appendChild(actions);
+      addColumnResizers(wrap);addSizeHandle(wrap);
+    });
+  }
+  function topChild(node){
+    if(node===ed)return null;
+    let el=node?.nodeType===1?node:node?.parentNode;
+    while(el&&el.parentNode!==ed)el=el.parentNode;
+    return el?.parentNode===ed?el:null;
+  }
+  function insertAtCaret(node){
+    const sel=window.getSelection();let range=null;
+    if(sel?.rangeCount&&ed.contains(sel.anchorNode))range=sel.getRangeAt(0).cloneRange();
+    else if(lastCaret&&ed.contains(lastCaret.startContainer))range=lastCaret.cloneRange();
+    if(!range){ed.appendChild(node);return;}
+    const top=topChild(range.startContainer);
+    if(!top){
+      if(range.startContainer===ed)ed.insertBefore(node,ed.childNodes[range.startOffset]||null);
+      else ed.appendChild(node);
+      return;
+    }
+    if(top.classList?.contains('memo-table')){top.after(node);return;}
+    if(top.nodeType===3){
+      const at=range.startContainer===top?range.startOffset:top.length;
+      const after=top.splitText(Math.max(0,Math.min(at,top.length)));
+      ed.insertBefore(node,after);return;
+    }
+    // Split the current paragraph at the caret so the table can be inserted
+    // between two lines without discarding formatting from either part.
+    try{
+      const remaining=document.createRange();remaining.setStart(range.startContainer,range.startOffset);remaining.setEnd(top,top.childNodes.length);
+      const fragment=remaining.extractContents();
+      const after=top.cloneNode(false);
+      after.appendChild(fragment);
+      top.after(node);
+      if(after.textContent.trim()||after.querySelector('img,br,video'))node.after(after);
+    }catch(e){top.after(node)}
+  }
+  insertBtn.addEventListener('pointerdown',e=>{
+    // Toolbar click normally blurs the editor and loses its caret.
+    e.preventDefault();
+  });
+  insertBtn.addEventListener('click',e=>{
+    e.preventDefault();if(mobile()||mode)return;
+    const t=makeTable();insertAtCaret(t);
+    const after=document.createElement('p');after.appendChild(document.createElement('br'));t.after(after);
+    enhanceTables();saveTableChange('table-insert');
+    t.querySelector('th')?.focus();
+  });
+  ed.addEventListener('keydown',e=>{
+    if(e.key!=='Tab'||!e.target.matches?.('.memo-table th,.memo-table td'))return;
+    const table=e.target.closest('table'),cells=[...table.querySelectorAll('th,td')];
+    const i=cells.indexOf(e.target),next=cells[i+(e.shiftKey?-1:1)];
+    if(next){e.preventDefault();next.focus();}
+  });
+  // The existing memo undo handler listens to the editor itself. Table cells
+  // are separate editing hosts, so include them in the same history shortcuts.
+  ed.addEventListener('keydown',e=>{
+    if(!e.target.matches?.('.memo-table th,.memo-table td'))return;
+    if(!(e.ctrlKey||e.metaKey)||e.altKey)return;
+    const k=e.key.toLowerCase();
+    if(k==='z'&&!e.shiftKey){e.preventDefault();e.stopPropagation();undoMemoEdit();}
+    else if(k==='y'||(k==='z'&&e.shiftKey)){e.preventDefault();e.stopPropagation();redoMemoEdit();}
+  },true);
+  function lineFromBlock(block){
+    if(block.classList.contains('memo-move-line'))return;
+    block.classList.add('memo-move-line');
+  }
+  function splitLineOnDirectBreaks(block){
+    const brs=[...block.childNodes].filter(n=>n.nodeType===1&&n.tagName==='BR');
+    if(!brs.length){lineFromBlock(block);return;}
+    const pieces=[];let segment=block.cloneNode(false);
+    for(const n of [...block.childNodes]){
+      if(n.nodeType===1&&n.tagName==='BR'){
+        if(!segment.hasChildNodes())segment.appendChild(document.createElement('br'));
+        pieces.push(segment);segment=block.cloneNode(false);n.remove();
+      }else segment.appendChild(n);
+    }
+    if(segment.hasChildNodes())pieces.push(segment);
+    else if(!pieces.length){segment.appendChild(document.createElement('br'));pieces.push(segment)}
+    pieces.forEach(p=>{lineFromBlock(p);block.before(p)});block.remove();
+  }
+  function normalizeLines(){
+    let pending=null;
+    const flush=(forceEmpty=false)=>{
+      if(pending){if(!pending.hasChildNodes())pending.appendChild(document.createElement('br'));pending=null;}
+      else if(forceEmpty){const d=document.createElement('div');d.className='memo-move-line';d.appendChild(document.createElement('br'));ed.appendChild(d);}
+    };
+    for(const node of [...ed.childNodes]){
+      if(node.nodeType===1&&node.classList.contains('memo-drop-marker'))continue;
+      if(node.nodeType===1&&node.classList.contains('memo-table')){flush();continue;}
+      if(node.nodeType===1&&['P','DIV','H1','H2','H3','H4','H5','H6','BLOCKQUOTE','LI'].includes(node.tagName)){
+        flush();splitLineOnDirectBreaks(node);continue;
+      }
+      if(node.nodeType===1&&node.tagName==='BR'){
+        if(pending)pending=null;
+        else {const d=document.createElement('div');d.className='memo-move-line';node.before(d);d.appendChild(document.createElement('br'));}
+        node.remove();continue;
+      }
+      // Whitespace can be an intentional part of a memo: never discard it.
+      if(!pending){pending=document.createElement('div');pending.className='memo-move-line';node.before(pending);}
+      pending.appendChild(node);
+    }
+    flush();
+  }
+  function paintSelection(){
+    for(const u of units()){
+      if(selected.has(u))u.dataset.moveSelected='1';else u.removeAttribute('data-move-selected');
+    }
+  }
+  function selectUnit(unit,e){
+    const all=units();
+    if(e.shiftKey&&lastSelected&&all.includes(lastSelected)){
+      const a=all.indexOf(lastSelected),b=all.indexOf(unit);
+      selected=new Set(all.slice(Math.min(a,b),Math.max(a,b)+1));
+    }else if(e.ctrlKey||e.metaKey){
+      if(selected.has(unit))selected.delete(unit);else selected.add(unit);
+      lastSelected=unit;
+    }else{selected=new Set([unit]);lastSelected=unit;}
+    paintSelection();
+  }
+  function addMoveHandles(){
+    if(!mode||mobile())return;
+    ed.querySelectorAll('.memo-move-handle').forEach(n=>n.remove());
+    for(const unit of units()){
+      const btn=document.createElement('button');btn.type='button';btn.className='memo-move-handle';
+      btn.setAttribute('contenteditable','false');btn.textContent='⋮⋮';
+      btn.title='クリックで行を選択、Shift+クリックで範囲選択、ドラッグで移動';
+      btn.setAttribute('aria-label',unit.classList.contains('memo-table')?'表を選択して移動':'この行を選択して移動');
+      unit.insertBefore(btn,unit.firstChild);
+      btn.addEventListener('pointerdown',e=>{
+        if(e.button!==0)return;
+        e.preventDefault();e.stopPropagation();
+        if(!selected.has(unit)||e.shiftKey||e.ctrlKey||e.metaKey)selectUnit(unit,e);
+        candidate={unit,startX:e.clientX,startY:e.clientY,dragging:false,target:null,before:true};
+        btn.setPointerCapture?.(e.pointerId);
+      });
+    }
+    paintSelection();
+  }
+  function removeMarker(){if(insertMarker){insertMarker.remove();insertMarker=null;}}
+  function endMode(){
+    mode=false;selected.clear();lastSelected=null;candidate=null;removeMarker();
+    ed.classList.remove('memo-move-mode');ed.contentEditable='true';
+    ed.querySelectorAll('.memo-move-handle').forEach(n=>n.remove());
+    ed.querySelectorAll('[data-move-selected]').forEach(n=>n.removeAttribute('data-move-selected'));
+    ed.querySelectorAll('.memo-table th,.memo-table td').forEach(c=>c.setAttribute('contenteditable','true'));
+    modeBtn.setAttribute('aria-pressed','false');modeBtn.title='文章や表を並べ替える';
+    if(moveTip)moveTip.hidden=true;
+  }
+  function startMode(){
+    if(mobile())return;
+    saveCurrent();mode=true;ed.classList.add('memo-move-mode');ed.contentEditable='false';
+    ed.querySelectorAll('.memo-table th,.memo-table td').forEach(c=>c.setAttribute('contenteditable','false'));
+    normalizeLines();addMoveHandles();
+    modeBtn.setAttribute('aria-pressed','true');modeBtn.title='移動モードを終了';
+    if(moveTip)moveTip.hidden=false;
+  }
+  modeBtn.addEventListener('click',e=>{e.preventDefault();if(mode)endMode();else startMode();});
+  // Use pointer events to move whole DOM nodes; a drop never rebuilds the
+  // marked-up text, so colors/size/bold and table cells are retained intact.
+  ed.addEventListener('pointermove',e=>{
+    if(!mode||!candidate)return;
+    if(!candidate.dragging && Math.hypot(e.clientX-candidate.startX,e.clientY-candidate.startY)<7)return;
+    candidate.dragging=true;
+    const el=document.elementFromPoint(e.clientX,e.clientY);
+    const target=el?.closest?.('.memo-move-line,.memo-table');
+    if(!target||!ed.contains(target)||selected.has(target)){
+      // Keep the last valid destination while crossing a narrow gap or the
+      // temporary insertion marker; otherwise a drop at the boundary is lost.
+      return;
+    }
+    const rect=target.getBoundingClientRect();
+    const before=e.clientY<rect.top+rect.height/2;
+    if(!insertMarker){insertMarker=document.createElement('div');insertMarker.className='memo-drop-marker memo-table-ui';}
+    if(before)target.before(insertMarker);else target.after(insertMarker);
+    candidate.target=target;candidate.before=before;
+  });
+  function finishDrag(e){
+    if(!candidate)return;
+    const c=candidate;candidate=null;
+    if(!c.dragging){removeMarker();return;}
+    if(c.target&&insertMarker){
+      const moving=units().filter(u=>selected.has(u));
+      const fragment=document.createDocumentFragment();moving.forEach(u=>fragment.appendChild(u));
+      insertMarker.before(fragment);
+      saveTableChange('move');
+      addMoveHandles();
+    }
+    removeMarker();
+  }
+  ed.addEventListener('pointerup',finishDrag);
+  ed.addEventListener('pointercancel',()=>{candidate=null;removeMarker();});
+  ed.addEventListener('click',e=>{
+    if(!mode)return;
+    const unit=e.target.closest?.('.memo-move-line,.memo-table');
+    if(unit&&!e.target.closest('.memo-move-handle')){selectUnit(unit,e);}
+  });
+  document.addEventListener('keydown',e=>{if(mode&&e.key==='Escape')endMode();});
+  window.addEventListener('resize',()=>{if(mode&&mobile())endMode();});
+  enhanceTables();
 })();
 
 </script>
