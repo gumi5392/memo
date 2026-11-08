@@ -55,6 +55,9 @@ button{color:inherit}
 .note-title{width:100%;background:transparent;border:0;outline:0;color:#171512;font-size:29px;font-weight:750;margin:4px 0 18px}
 .editor{min-height:58vh;outline:0;line-height:1.8;font-size:16px;color:#24211d}
 .editor:empty:before{content:"ここにメモを書いてください…";color:#81796e}
+/* v6.14.9: Enter inserts one logical line, not a browser-default paragraph gap.
+   Preserve real empty lines (<p><br></p>) and spacing for headings/tables. */
+.editor > p{margin-block-start:0;margin-block-end:0}
 .editor img{max-width:100%;height:auto;border-radius:8px}
 .hint{margin-top:28px;color:#81796e;font-size:12px}
 .resize-handle{width:5px;cursor:col-resize;background:transparent;z-index:10}
@@ -622,7 +625,7 @@ body.mobile-sort-active .app>.sidebar .sidebar-body,body.mobile-sort-active .app
   #genres .server,.cat-head,.note{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-user-drag:none}
   #genres .server.sort-dragging,.cat-head.sort-dragging,.note.sort-dragging{filter:brightness(1.09);box-shadow:0 0 0 2px var(--accent) inset}
 }
-/* v6.14.8: Compact cells and drag-range selection for desktop move mode */
+/* v6.14.9: Compact cells and drag-range selection for desktop move mode */
 .memo-insert-table-btn,.memo-move-mode-btn{white-space:nowrap}
 .memo-move-mode-btn[aria-pressed="true"]{background:#d0e7d6!important;border-color:#338f63!important;color:#125a3a!important}
 .memo-table{--memo-table-scale:1;position:relative;display:block;margin:14px 0 18px;width:640px;max-width:100%;vertical-align:top;user-select:text}
@@ -3337,7 +3340,7 @@ normalizeCategories(currentGenre().categories);if(!data.activeCategoryId)data.ac
 /* v6.5: PWA update detection + user-initiated safe refresh. */
 (function(){
  'use strict';
- const INSTALLED_BUILD='6.14.8';
+ const INSTALLED_BUILD='6.14.9';
  const intervalMs=10*60*1000;
  const status=document.getElementById('appUpdateStatus');
  const buildLabel=document.getElementById('appBuildLabel');
@@ -3723,7 +3726,7 @@ alignScratchHistory();
   },true);
 })();
 
-/* v6.14.8: tables and drag-range move mode (test only).
+/* v6.14.9: tables and drag-range move mode (test only).
  * Tables are saved as native HTML, with UI widgets excluded from the snapshot.
  * A move affects a complete DOM line or table block; original rich text stays in nodes.
  */
@@ -3946,7 +3949,19 @@ alignScratchHistory();
     const t=makeTable();insertAtCaret(t);
     const after=document.createElement('p');after.appendChild(document.createElement('br'));t.after(after);
     enhanceTables();saveTableChange('table-insert');
-    t.querySelector('th')?.focus();
+    // .focus() alone may leave the caret at the editor's former position
+    // (e.g. the right edge of the first green header cell). Explicitly
+    // collapse the Selection at the beginning of the cell.
+    const firstHeader=t.querySelector('thead th');
+    if(firstHeader){
+      firstHeader.focus({preventScroll:true});
+      const caret=document.createRange();
+      caret.selectNodeContents(firstHeader);
+      caret.collapse(true);
+      const selection=window.getSelection();
+      selection.removeAllRanges();selection.addRange(caret);
+      activeCell=firstHeader;
+    }
   });
   ed.addEventListener('keydown',e=>{
     if(e.key!=='Tab'||!e.target.matches?.('.memo-table th,.memo-table td'))return;
