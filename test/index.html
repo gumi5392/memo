@@ -55,7 +55,7 @@ button{color:inherit}
 .note-title{width:100%;background:transparent;border:0;outline:0;color:#171512;font-size:29px;font-weight:750;margin:4px 0 18px}
 .editor{min-height:58vh;outline:0;line-height:1.8;font-size:16px;color:#24211d}
 .editor:empty:before{content:"ここにメモを書いてください…";color:#81796e}
-/* v6.14.9: Enter inserts one logical line, not a browser-default paragraph gap.
+/* v6.14.10: Enter inserts one logical line, not a browser-default paragraph gap.
    Preserve real empty lines (<p><br></p>) and spacing for headings/tables. */
 .editor > p{margin-block-start:0;margin-block-end:0}
 .editor img{max-width:100%;height:auto;border-radius:8px}
@@ -625,7 +625,7 @@ body.mobile-sort-active .app>.sidebar .sidebar-body,body.mobile-sort-active .app
   #genres .server,.cat-head,.note{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-user-drag:none}
   #genres .server.sort-dragging,.cat-head.sort-dragging,.note.sort-dragging{filter:brightness(1.09);box-shadow:0 0 0 2px var(--accent) inset}
 }
-/* v6.14.9: Compact cells and drag-range selection for desktop move mode */
+/* v6.14.10: Compact cells and drag-range selection for desktop move mode */
 .memo-insert-table-btn,.memo-move-mode-btn{white-space:nowrap}
 .memo-move-mode-btn[aria-pressed="true"]{background:#d0e7d6!important;border-color:#338f63!important;color:#125a3a!important}
 .memo-table{--memo-table-scale:1;position:relative;display:block;margin:14px 0 18px;width:640px;max-width:100%;vertical-align:top;user-select:text}
@@ -642,9 +642,12 @@ body.mobile-sort-active .app>.sidebar .sidebar-body,body.mobile-sort-active .app
 .memo-table-actions button:hover{background:var(--hover)}
 .memo-table-actions .table-remove{margin-left:auto;color:var(--danger);border-color:#bd918c;background:transparent}
 .memo-table-resize{position:absolute;right:-4px;bottom:-4px;width:15px;height:15px;border-radius:4px;background:var(--accent);border:2px solid #f5efe2;cursor:nwse-resize;z-index:4;touch-action:none}
-.memo-col-resizer{position:absolute;right:-5px;top:0;bottom:0;width:10px;z-index:4;cursor:col-resize;touch-action:none}
-.memo-col-resizer::after{content:'';position:absolute;right:4px;top:15%;height:70%;width:2px;background:#ffffff80}
-.memo-col-resizer:hover::after{width:4px;right:3px;background:#fff}
+/* v6.14.10: The width grip is a CSS pseudo-element, NOT a DOM child of
+   contenteditable <th>. A noneditable child inside an empty editing host
+   misplaces the insertion caret and makes Chromium keep an extra <br> on erase. */
+.memo-table th:not(:last-child)::after{content:'';position:absolute;right:-5px;top:0;bottom:0;width:10px;z-index:4;cursor:col-resize;touch-action:none;background:linear-gradient(to right,transparent calc(50% - 1px),#ffffff80 calc(50% - 1px),#ffffff80 calc(50% + 1px),transparent calc(50% + 1px));pointer-events:auto}
+.memo-table th:not(:last-child):hover::after{background:linear-gradient(to right,transparent calc(50% - 2px),#ffffff calc(50% - 2px),#ffffff calc(50% + 2px),transparent calc(50% + 2px))}
+.editor.memo-move-mode .memo-table th::after{display:none}
 .editor.memo-move-mode{position:relative;padding-left:37px;cursor:crosshair;-webkit-user-select:none;user-select:none}
 .editor.memo-move-mode .memo-move-line,.editor.memo-move-mode .memo-table{position:relative;min-height:1.7em;cursor:crosshair}
 .editor.memo-move-mode .memo-move-line{margin:0;white-space:normal}
@@ -668,6 +671,7 @@ body[data-theme="dark"] .editor.memo-move-mode [data-move-selected="1"]{backgrou
   .editor.memo-move-mode{padding-left:0}
   .memo-table{width:100%!important;max-width:100%;margin:12px 0}
   .memo-table th,.memo-table td{padding:5px 7px;font-size:13px;min-width:0}
+  .memo-table th::after{display:none}
   .memo-table-actions{gap:5px}.memo-table-actions button{padding:7px;font-size:11px}
   .memo-table-actions .table-remove{margin-left:0}
 }
@@ -3340,7 +3344,7 @@ normalizeCategories(currentGenre().categories);if(!data.activeCategoryId)data.ac
 /* v6.5: PWA update detection + user-initiated safe refresh. */
 (function(){
  'use strict';
- const INSTALLED_BUILD='6.14.9';
+ const INSTALLED_BUILD='6.14.10';
  const intervalMs=10*60*1000;
  const status=document.getElementById('appUpdateStatus');
  const buildLabel=document.getElementById('appBuildLabel');
@@ -3726,7 +3730,7 @@ alignScratchHistory();
   },true);
 })();
 
-/* v6.14.9: tables and drag-range move mode (test only).
+/* v6.14.10: tables and drag-range move mode (test only).
  * Tables are saved as native HTML, with UI widgets excluded from the snapshot.
  * A move affects a complete DOM line or table block; original rich text stays in nodes.
  */
@@ -3831,25 +3835,29 @@ alignScratchHistory();
     const t=wrap.querySelector('table');
     const cols=[...t.querySelectorAll('colgroup col')],heads=[...t.querySelectorAll('thead th')];
     heads.slice(0,-1).forEach((head,index)=>{
-      const h=document.createElement('span');h.className='memo-col-resizer memo-table-ui';
-      h.setAttribute('contenteditable','false');h.title='左右へドラッグして列幅を変更';head.appendChild(h);
-      h.addEventListener('pointerdown',e=>{
-        if(mode||mobile())return;
+      // Keep the editing host completely free of noneditable inline children.
+      // The visible grip comes from th::after and pointer gestures on its edge.
+      head.addEventListener('pointerdown',e=>{
+        if(mode||mobile()||e.button!==0)return;
+        const r=head.getBoundingClientRect();
+        if(e.clientX<r.right-10||e.clientX>r.right+5)return;
         e.preventDefault();e.stopPropagation();
         const total=t.getBoundingClientRect().width||640;
         const first=parseFloat(cols[index].style.width),second=parseFloat(cols[index+1].style.width);
         const x=e.clientX;
-        h.setPointerCapture?.(e.pointerId);
+        head.setPointerCapture?.(e.pointerId);
         const move=ev=>{
           const delta=100*(ev.clientX-x)/total;
           const next=Math.max(8,Math.min(first+second-8,first+delta));
           cols[index].style.width=next+'%';cols[index+1].style.width=(first+second-next)+'%';
         };
         const up=()=>{
-          h.removeEventListener('pointermove',move);h.removeEventListener('pointerup',up);
-          h.removeEventListener('pointercancel',up);saveTableChange('table-col-resize');
+          head.removeEventListener('pointermove',move);head.removeEventListener('pointerup',up);
+          head.removeEventListener('pointercancel',up);
+          try{if(head.hasPointerCapture(e.pointerId))head.releasePointerCapture(e.pointerId)}catch(err){}
+          saveTableChange('table-col-resize');
         };
-        h.addEventListener('pointermove',move);h.addEventListener('pointerup',up);h.addEventListener('pointercancel',up);
+        head.addEventListener('pointermove',move);head.addEventListener('pointerup',up);head.addEventListener('pointercancel',up);
       });
     });
   }
@@ -3881,6 +3889,9 @@ alignScratchHistory();
     // unwanted extra line. Only trim that *single trailing* placeholder in a
     // nonempty single-line cell; preserve intentional multi-line cell content.
     const children=[...cell.childNodes];
+    if(children.length===1 && children[0].nodeType===1 && children[0].tagName==='BR'){
+      cell.replaceChildren();return;
+    }
     const last=children.at(-1);
     if(!last || last.nodeType!==1 || last.tagName!=='BR' || !cell.textContent.trim())return;
     if(children.some(n=>n!==last&&n.nodeType===1&&(n.tagName==='BR'||['DIV','P'].includes(n.tagName))))return;
@@ -3969,6 +3980,18 @@ alignScratchHistory();
     const i=cells.indexOf(e.target),next=cells[i+(e.shiftKey?-1:1)];
     if(next){e.preventDefault();next.focus();}
   });
+  // Keep a truly empty cell empty after deleting its last character.
+  // Do not rewrite nonempty content or multi-line content, and never normalize
+  // during Japanese input composition.
+  ed.addEventListener('input',e=>{
+    const cell=e.target.closest?.('.memo-table th,.memo-table td');
+    if(!cell||e.isComposing||!e.inputType?.startsWith('delete'))return;
+    if(cell.childNodes.length===1&&cell.firstChild?.nodeName==='BR'){
+      cell.replaceChildren();
+      const r=document.createRange();r.selectNodeContents(cell);r.collapse(true);
+      const s=window.getSelection();s.removeAllRanges();s.addRange(r);
+    }
+  },true); // capture: normalize before the existing save + undo listeners run
   // The existing memo undo handler listens to the editor itself. Table cells
   // are separate editing hosts, so include them in the same history shortcuts.
   ed.addEventListener('keydown',e=>{
