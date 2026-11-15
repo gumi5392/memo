@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#2f2419">
-<link rel="manifest" href="manifest.webmanifest?v=61414">
+<link rel="manifest" href="manifest.webmanifest?v=61415">
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=690">
 <title>メモ帳テスト</title>
 <style>
@@ -686,7 +686,7 @@ body[data-theme="dark"] #memoMoveTip{background:#21362b;color:#bce0c7;border-col
 @media(max-width:800px){#memoMoveTip{display:none!important}}
 
 
-/* TEST v6.14.14: viewport-safe iPhone editing, native selection and icon actions. */
+/* TEST v6.14.15: viewport-safe iPhone editing, native selection and icon actions. */
 .mobile-genre-move-action,.mobile-icon-move-hint{display:none!important}
 @media(max-width:800px){
   html{-webkit-text-size-adjust:100%;}
@@ -720,7 +720,7 @@ body[data-theme="dark"] #memoMoveTip{background:#21362b;color:#bce0c7;border-col
   .mobile-menu-btn,.server,.cat-head,.note,.scratch-mobile-menu,.scratch-open-btn,.icon-btn{touch-action:manipulation;}
   /* Do not turn off pinch zoom; prevent only unintentional element zoom. */
   .modal input,.auth-panel input,.safe-dialog-input,.sync-modal input{font-size:max(16px,1em);}
-  #contextMenu .mobile-genre-move-action{display:block!important}
+  #contextMenu .mobile-genre-move-action{display:none!important}
   .mobile-icon-move-hint:not([hidden]){display:flex!important;align-items:center;gap:10px;justify-content:space-between;
     position:fixed;left:75px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:85;
     padding:9px 11px;background:var(--panel2);color:var(--text);border:1px solid var(--line);
@@ -732,6 +732,13 @@ body[data-theme="dark"] #memoMoveTip{background:#21362b;color:#bce0c7;border-col
   body.mobile-icon-moving #genres .server.mobile-icon-move-source{opacity:.65;}
 }
 
+/* TEST v6.14.15: isolate editing scroll areas during keyboard resizing. */
+@media(max-width:800px){
+  #scratchText{flex:1 1 auto;height:100%;overflow-y:auto;overscroll-behavior-y:contain;}
+  .app>.main>.memo-workspace>.scratch-panel>.scratch-content{min-height:0;overflow:hidden;}
+  .app>.main>.topbar,.scratch-header{backface-visibility:hidden;transform:translateZ(0);}
+  #editor,#scratchText{touch-action:pan-y;}
+}
 </style>
 </head>
 <body>
@@ -914,7 +921,7 @@ body[data-theme="dark"] #memoMoveTip{background:#21362b;color:#bce0c7;border-col
       <button class="theme-option dark" id="themeDark"><span class="preview"><span class="p-side"></span><span class="p-main"></span></span><strong>ダーク</strong><span>これまでの配色</span></button>
     </div>
     <div class="app-update-settings" aria-live="polite">
-      <div class="app-update-heading"><strong>アプリの更新</strong><span id="appBuildLabel">テスト v6.14.14</span></div>
+      <div class="app-update-heading"><strong>アプリの更新</strong><span id="appBuildLabel">テスト v6.14.15</span></div>
       <p id="appUpdateStatus">更新情報を確認しています…</p>
       <p id="appUpdateEnvironment" class="app-update-environment" aria-live="polite"></p>
       <div class="app-update-actions">
@@ -1029,7 +1036,6 @@ body[data-theme="dark"] #memoMoveTip{background:#21362b;color:#bce0c7;border-col
 <div class="context-menu" id="contextMenu">
   <button id="renameGenre" style="display:none">メモ名を変更</button>
   <button id="editGenreIcon">アイコンを編集</button>
-  <button id="moveGenreMobile" class="mobile-genre-move-action" type="button">アイコンを移動</button>
   <button id="deleteGenre" class="danger">メモを削除</button>
 </div>
 <div class="context-menu" id="genreSettingsMenu">
@@ -3428,8 +3434,12 @@ normalizeCategories(currentGenre().categories);if(!data.activeCategoryId)data.ac
       if(!mobile() || doubleSlideTimer || e.touches.length!==1 || e.target.closest('button, input, select, video, .media-resize'))return;
       // Native caret dragging, long-press selection and text editing always win over
       // the app's horizontal navigation. This covers both memo and scratch editors.
-      if(e.target.closest('#editor,#scratchText,#noteTitle,[contenteditable],textarea'))return;
-      const t=e.touches[0];gesture={x:t.clientX,y:t.clientY,time:performance.now(),view:getView(),mode:null,last:0};
+      const editable=e.target.closest('#editor,#scratchText,#noteTitle,[contenteditable],textarea');
+      // Allow deliberate horizontal swipes from text areas, but never capture
+      // a stationary selection hold, selection-handle drag or vertical scroll.
+      const selected=window.getSelection();
+      if(editable && (selected && !selected.isCollapsed && selected.toString().length))return;
+      const t=e.touches[0];gesture={x:t.clientX,y:t.clientY,time:performance.now(),view:getView(),mode:null,last:0,editable:!!editable};
     },{passive:true});
     app.addEventListener('touchmove',e=>{
       if(!gesture||!mobile()||e.touches.length!==1)return;
@@ -3437,6 +3447,12 @@ normalizeCategories(currentGenre().categories);if(!data.activeCategoryId)data.ac
       if(gesture.mode==='vertical')return;
       if(!gesture.mode){
         if(Math.max(Math.abs(dx),Math.abs(dy))<9)return;
+        if(gesture.editable && (performance.now()-gesture.time>260 ||
+           Math.abs(dx)<16 || Math.abs(dx)<Math.abs(dy)*1.55 ||
+           (window.getSelection()?.toString()?.length>0))){
+          if(performance.now()-gesture.time>260 || Math.abs(dy)>Math.abs(dx)){gesture.mode='vertical';}
+          return;
+        }
         if(Math.abs(dy)>Math.abs(dx)*1.15){gesture.mode='vertical';return}
         const allowed=(gesture.view==='list'&&dx<0)||(gesture.view==='memo'&&dx!==0)||(gesture.view==='scratch'&&dx>0);
         if(!allowed){gesture.mode='vertical';return}
@@ -3502,7 +3518,7 @@ normalizeCategories(currentGenre().categories);if(!data.activeCategoryId)data.ac
 /* TEST v6.14.13: Safe iPhone home-screen PWA updates (no icon re-add). */
 (function(){
  'use strict';
- const INSTALLED_BUILD='6.14.14';
+ const INSTALLED_BUILD='6.14.15';
  const CHECK_INTERVAL_MS=3*60*1000;
  const status=document.getElementById('appUpdateStatus');
  const buildLabel=document.getElementById('appBuildLabel');
@@ -3736,7 +3752,17 @@ normalizeCategories(currentGenre().categories);if(!data.activeCategoryId)data.ac
   function ensureCaretVisible(){
     caretFrame=0;
     if(!media.matches||!editing()||!keyboardOpen)return;
-    if(document.activeElement!==edit)return; // textarea has its own native caret scroller
+    if(document.activeElement===scratch){
+      // The textarea is the scroll container for its own selection and must
+      // remain entirely above the keyboard, even when focused near its end.
+      const bounds=scratch.getBoundingClientRect();
+      const panel=document.querySelector('.scratch-content')?.getBoundingClientRect();
+      if(panel && bounds.bottom>panel.bottom+1){
+        scratch.style.maxHeight=Math.max(90,Math.floor(panel.bottom-bounds.top))+'px';
+      }
+      return;
+    }
+    if(document.activeElement!==edit)return;
     const selection=window.getSelection();
     if(!selection?.rangeCount||!selection.isCollapsed||!edit.contains(selection.anchorNode))return;
     const r=selection.getRangeAt(0).cloneRange();
@@ -3793,7 +3819,7 @@ normalizeCategories(currentGenre().categories);if(!data.activeCategoryId)data.ac
   });
   document.addEventListener('selectionchange',scheduleCaret);
   edit.addEventListener('input',scheduleCaret);
-  scratch.addEventListener('input',scheduleLayout);
+  scratch.addEventListener('input',()=>{scheduleLayout();scheduleCaret()});
   document.addEventListener('focusout',()=>setTimeout(scheduleLayout,120));
   updateMobileLayout();
 })();
@@ -3945,7 +3971,7 @@ alignScratchHistory();
   document.addEventListener('touchstart',e=>{
     if(!mobile()||!isList()||e.touches.length!==1)return;
     const source=sourceFrom(e.target);
-    if(!source || source.type==='genre')return; // v6.14.14: genre icons use their separate options -> move interaction.
+    if(!source || source.type==='genre')return; // v6.14.14: genre icons use hold-to-drag interaction.
     cleanTimer();
     const t=e.touches[0];
     candidate={source,x:t.clientX,y:t.clientY,startX:t.clientX,startY:t.clientY,active:false,moved:false,hit:null};
@@ -4005,105 +4031,98 @@ alignScratchHistory();
   },true);
 })();
 
-/* TEST v6.14.14: one icon gesture = one action.
-   Hold opens the icon options only. Explicit "アイコンを移動" arms a
-   single drag, ending on drop; this is separate from category/note sorting. */
+/* TEST v6.14.15: hold to reorder icons, double tap for options.
+   Tap uses a short delay to distinguish single selection from double tap. */
 (function initMobileIconActions(){
   const icons=document.getElementById('genres');
-  const menu=document.getElementById('contextMenu');
-  const moveBtn=document.getElementById('moveGenreMobile');
-  const hint=document.getElementById('mobileIconMoveHint');
-  const cancelBtn=document.getElementById('mobileIconMoveCancel');
-  if(!icons||!menu||!moveBtn||!hint||!cancelBtn)return;
+  if(!icons)return;
   const mobile=()=>window.matchMedia('(max-width:800px)').matches;
-  let armed=-1,start=null,timer=null,blockClickUntil=0;
-  const clearTimer=()=>{if(timer!==null){clearTimeout(timer);timer=null}};
-  function iconAt(target){
-    const icon=target instanceof Element?target.closest('#genres .server'):null;
-    if(!icon||icon.classList.contains('add')||icon.classList.contains('settings'))return null;
-    return {el:icon,index:[...icons.querySelectorAll('.server:not(.add):not(.settings)')].indexOf(icon)};
+  let hold=null, holdTimer=null, lastTap=null, tapTimer=null, ignoreClickUntil=0;
+  function iconAt(node){
+    const el=node instanceof Element?node.closest('#genres .server'):null;
+    if(!el||el.classList.contains('add')||el.classList.contains('settings'))return null;
+    const index=[...icons.querySelectorAll('.server:not(.add):not(.settings)')].indexOf(el);
+    return index<0?null:{el,index};
   }
-  function paint(){
-    icons.querySelectorAll('.server').forEach((node,i)=>node.classList.toggle('mobile-icon-move-source',mobile()&&armed===i));
-    hint.hidden=armed<0||!mobile();
-  }
-  function cancel(){armed=-1;start=null;clearTimer();paint();clearSortIndicators();document.body.classList.remove('mobile-icon-moving')}
-  window.cancelMobileIconMove=cancel;
-  moveBtn.addEventListener('click',e=>{
-    e.stopPropagation();
-    const index=Number(data._contextGenre);
-    closeAllMenus();
-    if(!mobile()||!Number.isInteger(index)||index<0||index>=data.genres.length)return;
-    armed=index;start=null;paint();
-  });
-  cancelBtn.addEventListener('click',cancel);
-  function showOptions(info,x,y){
-    if(!info||armed>=0)return;
-    blockClickUntil=performance.now()+750;
-    mobileGenreSuppressUntil=blockClickUntil;
-    closeAllMenus();
-    openContext(Math.max(72,x+10),Math.max(8,y-12),info.index);
-  }
+  function clearHold(){if(holdTimer!==null){clearTimeout(holdTimer);holdTimer=null}}
+  function clearTap(){if(tapTimer!==null){clearTimeout(tapTimer);tapTimer=null}lastTap=null}
+  function cleanup(){clearHold();hold=null;document.body.classList.remove('mobile-icon-moving');clearSortIndicators()}
+  window.cancelMobileIconMove=()=>{cleanup();clearTap()};
   icons.addEventListener('touchstart',e=>{
-    clearTimer();start=null;
+    cleanup();
     if(!mobile()||!document.body.classList.contains('mobile-list')||e.touches.length!==1)return;
     const info=iconAt(e.target);if(!info)return;
     const t=e.touches[0];
-    if(armed>=0 && info.index!==armed)return;
-    start={info,x:t.clientX,y:t.clientY,moved:false,dragging:false,drop:null};
-    if(armed<0){
-      timer=setTimeout(()=>{
-        timer=null;
-        if(!start||start.moved)return;
-        showOptions(start.info,start.x,start.y);
-      },520);
-    }else{
+    hold={info,x:t.clientX,y:t.clientY,active:false,hit:null,moved:false};
+    holdTimer=setTimeout(()=>{
+      holdTimer=null;
+      if(!hold)return;
+      clearTap();closeAllMenus();
+      hold.active=true;hold.info.el.classList.add('sort-dragging');
       document.body.classList.add('mobile-icon-moving');
-    }
+      navigator.vibrate?.(10);
+    },420);
   },{passive:true});
   icons.addEventListener('touchmove',e=>{
-    if(!start||e.touches.length!==1)return;
+    if(!hold||e.touches.length!==1)return;
     const t=e.touches[0];
-    const dx=t.clientX-start.x,dy=t.clientY-start.y;
-    if(Math.hypot(dx,dy)<9)return;
-    start.moved=true;clearTimer();
-    if(armed<0)return; // ordinary gesture must remain a vertical icon-list scroll
-    start.dragging=true;
+    if(!hold.active){
+      if(Math.hypot(t.clientX-hold.x,t.clientY-hold.y)>11)cleanup();
+      return;
+    }
     if(e.cancelable)e.preventDefault();
     e.stopImmediatePropagation();
+    hold.moved=true;
     icons.querySelectorAll('.server.drop-target').forEach(n=>n.classList.remove('drop-target'));
-    const info=iconAt(document.elementFromPoint(t.clientX,t.clientY));
-    start.drop=info&&info.index!==armed?info:null;
-    start.drop?.el.classList.add('drop-target');
+    const target=iconAt(document.elementFromPoint(t.clientX,t.clientY));
+    hold.hit=target&&target.index!==hold.info.index?target:null;
+    hold.hit?.el.classList.add('drop-target');
+    // Drag near rail edges to reorder icons beyond the visible list.
+    const box=icons.getBoundingClientRect();
+    if(t.clientY<box.top+40)icons.scrollTop-=12;
+    else if(t.clientY>box.bottom-40)icons.scrollTop+=12;
   },{passive:false});
   function finish(e,canceled){
-    if(!start)return;
-    const state=start;start=null;clearTimer();
-    if(armed<0)return;
-    if(state.dragging){
-      if(e.cancelable)e.preventDefault();e.stopImmediatePropagation();
-      blockClickUntil=performance.now()+600;
-      mobileGenreSuppressUntil=blockClickUntil;
-      const from=armed,to=state.drop?.index;
-      cancel();
-      if(!canceled&&Number.isInteger(to))moveGenreByIndex(from,to);
-    }else{
-      document.body.classList.remove('mobile-icon-moving');
-    }
+    if(!hold)return;
+    const h=hold;cleanup();
+    if(!h.active)return;
+    if(e.cancelable)e.preventDefault();e.stopImmediatePropagation();
+    ignoreClickUntil=performance.now()+800;
+    mobileGenreSuppressUntil=ignoreClickUntil;
+    if(!canceled&&h.hit)moveGenreByIndex(h.info.index,h.hit.index);
   }
   icons.addEventListener('touchend',e=>finish(e,false),{capture:true,passive:false});
   icons.addEventListener('touchcancel',e=>finish(e,true),{capture:true,passive:false});
-  document.addEventListener('click',e=>{
-    if(!mobile()||performance.now()>blockClickUntil)return;
-    if(e.target.closest('#genres .server')){e.preventDefault();e.stopImmediatePropagation()}
-  },true);
-  icons.addEventListener('contextmenu',e=>{
-    if(!mobile())return;
+  // Capture synthesized clicks so a single tap still selects its genre,
+  // while two taps open the existing icon edit/delete options.
+  icons.addEventListener('click',e=>{
+    if(!mobile()||!document.body.classList.contains('mobile-list'))return;
     const info=iconAt(e.target);if(!info)return;
     e.preventDefault();e.stopImmediatePropagation();
-    if(armed<0&&!menu.classList.contains('show'))showOptions(info,e.clientX,e.clientY);
+    if(performance.now()<ignoreClickUntil||performance.now()<mobileGenreSuppressUntil)return;
+    const now=performance.now();
+    if(lastTap&&lastTap.index===info.index&&now-lastTap.time<360){
+      clearTap();ignoreClickUntil=now+450;
+      mobileGenreSuppressUntil=now+450;
+      closeAllMenus();
+      const box=info.el.getBoundingClientRect();
+      openContext(Math.max(72,box.right+8),Math.max(8,box.top),info.index);
+      return;
+    }
+    clearTap();lastTap={index:info.index,time:now};
+    tapTimer=setTimeout(()=>{
+      const selected=lastTap;clearTap();
+      if(!selected||!mobile())return;
+      const current=icons.querySelectorAll('.server:not(.add):not(.settings)')[selected.index];
+      if(current?.onclick)current.onclick({preventDefault(){},stopPropagation(){}});
+    },320);
   },true);
-  window.addEventListener('resize',()=>{if(!mobile())cancel()});
+  icons.addEventListener('contextmenu',e=>{
+    if(!mobile()||!iconAt(e.target))return;
+    // iOS long-press must not open the native menu or icon options.
+    e.preventDefault();e.stopImmediatePropagation();
+  },true);
+  window.addEventListener('resize',()=>{if(!mobile()){cleanup();clearTap()}});
 })();
 
 /* v6.14.13: tables and drag-range move mode (test only).
