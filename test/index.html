@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#2f2419">
-<link rel="manifest" href="manifest.webmanifest?v=61413">
+<link rel="manifest" href="manifest.webmanifest?v=61414">
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=690">
 <title>メモ帳テスト</title>
 <style>
@@ -685,6 +685,53 @@ body[data-theme="dark"] .editor.memo-move-mode [data-move-selected="1"]{backgrou
 body[data-theme="dark"] #memoMoveTip{background:#21362b;color:#bce0c7;border-color:#36684e}
 @media(max-width:800px){#memoMoveTip{display:none!important}}
 
+
+/* TEST v6.14.14: viewport-safe iPhone editing, native selection and icon actions. */
+.mobile-genre-move-action,.mobile-icon-move-hint{display:none!important}
+@media(max-width:800px){
+  html{-webkit-text-size-adjust:100%;}
+  /* Contain the app in iOS's *visible* viewport even after keyboard panning.
+     Only the memo and scratch text areas scroll; both title bars stay on top. */
+  .app,body.mobile-list .app{
+    position:fixed!important;left:0;right:0;top:var(--memo-mobile-visual-top,0px);
+    height:var(--memo-mobile-viewport,100dvh)!important;
+    max-height:var(--memo-mobile-viewport,100dvh)!important;
+    min-height:0!important;overflow:hidden;
+  }
+  .app>.main{min-height:0;max-height:100%;}
+  .app>.main>.topbar{position:relative;z-index:16;flex:0 0 60px;min-height:60px;overflow:hidden;}
+  .app>.main>.memo-workspace{min-height:0;overflow:hidden;}
+  .app>.main>.memo-workspace>.memo-column,
+  .app>.main>.memo-workspace>.scratch-panel{min-height:0;max-height:100%;}
+  .app>.main>.memo-workspace>.memo-column>.editor-wrap{
+    flex:1 1 auto;min-height:0;overscroll-behavior-y:contain;
+    -webkit-overflow-scrolling:touch;overflow-y:auto;
+    padding-bottom:calc(20px + env(safe-area-inset-bottom));
+  }
+  /* Avoid a tall, old 58vh editing surface under the iOS keyboard. */
+  #editor{min-height:max(135px,calc(var(--memo-mobile-viewport,100dvh) - 160px));
+    -webkit-user-select:text;user-select:text;-webkit-touch-callout:default;touch-action:pan-y;}
+  .app>.main>.memo-workspace>.scratch-panel>.scratch-header{
+    position:relative;z-index:12;flex:0 0 60px;min-height:60px;
+  }
+  .scratch-content{min-height:0;flex:1 1 auto;overflow:hidden;padding-bottom:calc(12px + env(safe-area-inset-bottom));}
+  #scratchText{font-size:16px;min-height:0;max-height:100%;-webkit-user-select:text;user-select:text;-webkit-touch-callout:default;touch-action:pan-y;}
+  #noteTitle{font-size:24px;}
+  .mobile-menu-btn,.server,.cat-head,.note,.scratch-mobile-menu,.scratch-open-btn,.icon-btn{touch-action:manipulation;}
+  /* Do not turn off pinch zoom; prevent only unintentional element zoom. */
+  .modal input,.auth-panel input,.safe-dialog-input,.sync-modal input{font-size:max(16px,1em);}
+  #contextMenu .mobile-genre-move-action{display:block!important}
+  .mobile-icon-move-hint:not([hidden]){display:flex!important;align-items:center;gap:10px;justify-content:space-between;
+    position:fixed;left:75px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:85;
+    padding:9px 11px;background:var(--panel2);color:var(--text);border:1px solid var(--line);
+    border-radius:10px;box-shadow:0 5px 20px #0004;font-size:13px;font-weight:600;}
+  .mobile-icon-move-hint button{background:var(--bg);border:1px solid var(--line);color:var(--text);
+    border-radius:7px;padding:8px 11px;font-size:13px;}
+  #genres .server.mobile-icon-move-source{outline:3px solid var(--memo-emerald);outline-offset:2px;}
+  body.mobile-icon-moving #genres{touch-action:none;}
+  body.mobile-icon-moving #genres .server.mobile-icon-move-source{opacity:.65;}
+}
+
 </style>
 </head>
 <body>
@@ -710,6 +757,10 @@ body[data-theme="dark"] #memoMoveTip{background:#21362b;color:#bce0c7;border-col
   <span id="appUpdateBannerText">新しいバージョンがあります</span>
   <button type="button" id="appUpdateBannerApply">更新する</button>
   <button type="button" id="appUpdateBannerDismiss" aria-label="あとで">×</button>
+</div>
+<div class="mobile-icon-move-hint" id="mobileIconMoveHint" role="status" aria-live="polite" hidden>
+  <span>アイコンをドラッグして移動</span>
+  <button type="button" id="mobileIconMoveCancel">キャンセル</button>
 </div>
 <div class="app" id="app">
   <aside class="servers">
@@ -863,7 +914,7 @@ body[data-theme="dark"] #memoMoveTip{background:#21362b;color:#bce0c7;border-col
       <button class="theme-option dark" id="themeDark"><span class="preview"><span class="p-side"></span><span class="p-main"></span></span><strong>ダーク</strong><span>これまでの配色</span></button>
     </div>
     <div class="app-update-settings" aria-live="polite">
-      <div class="app-update-heading"><strong>アプリの更新</strong><span id="appBuildLabel">テスト v6.14.13</span></div>
+      <div class="app-update-heading"><strong>アプリの更新</strong><span id="appBuildLabel">テスト v6.14.14</span></div>
       <p id="appUpdateStatus">更新情報を確認しています…</p>
       <p id="appUpdateEnvironment" class="app-update-environment" aria-live="polite"></p>
       <div class="app-update-actions">
@@ -978,6 +1029,7 @@ body[data-theme="dark"] #memoMoveTip{background:#21362b;color:#bce0c7;border-col
 <div class="context-menu" id="contextMenu">
   <button id="renameGenre" style="display:none">メモ名を変更</button>
   <button id="editGenreIcon">アイコンを編集</button>
+  <button id="moveGenreMobile" class="mobile-genre-move-action" type="button">アイコンを移動</button>
   <button id="deleteGenre" class="danger">メモを削除</button>
 </div>
 <div class="context-menu" id="genreSettingsMenu">
@@ -3350,6 +3402,7 @@ normalizeCategories(currentGenre().categories);if(!data.activeCategoryId)data.ac
       if(view!=='memo')document.activeElement?.blur?.();
       document.body.classList.toggle('mobile-list',view==='list');
       document.body.classList.toggle('mobile-scratch',view==='scratch');
+      if(view!=='list')window.cancelMobileIconMove?.();
       app.classList.remove('nav-dragging');app.style.removeProperty('--nav-offset');
       document.getElementById('scratchPanel').style.removeProperty('transform');
     }
@@ -3373,8 +3426,9 @@ normalizeCategories(currentGenre().categories);if(!data.activeCategoryId)data.ac
     app.addEventListener('touchstart',e=>{
       gesture=null;
       if(!mobile() || doubleSlideTimer || e.touches.length!==1 || e.target.closest('button, input, select, video, .media-resize'))return;
-      // Text selection takes priority over swiping inside an actively edited textarea.
-      if(e.target.closest('textarea')&&document.activeElement===e.target)return;
+      // Native caret dragging, long-press selection and text editing always win over
+      // the app's horizontal navigation. This covers both memo and scratch editors.
+      if(e.target.closest('#editor,#scratchText,#noteTitle,[contenteditable],textarea'))return;
       const t=e.touches[0];gesture={x:t.clientX,y:t.clientY,time:performance.now(),view:getView(),mode:null,last:0};
     },{passive:true});
     app.addEventListener('touchmove',e=>{
@@ -3448,7 +3502,7 @@ normalizeCategories(currentGenre().categories);if(!data.activeCategoryId)data.ac
 /* TEST v6.14.13: Safe iPhone home-screen PWA updates (no icon re-add). */
 (function(){
  'use strict';
- const INSTALLED_BUILD='6.14.13';
+ const INSTALLED_BUILD='6.14.14';
  const CHECK_INTERVAL_MS=3*60*1000;
  const status=document.getElementById('appUpdateStatus');
  const buildLabel=document.getElementById('appBuildLabel');
@@ -3672,31 +3726,59 @@ normalizeCategories(currentGenre().categories);if(!data.activeCategoryId)data.ac
   const main=document.getElementById('memoColumn');
   const media=window.matchMedia('(max-width:800px)');
   const visual=window.visualViewport;
-  let frame=0;
+  const edit=document.getElementById('editor');
+  const scratch=document.getElementById('scratchText');
+  let frame=0,caretFrame=0,keyboardOpen=false;
+  let lastFullHeight=Math.max(window.innerHeight,document.documentElement.clientHeight,visual?.height||0);
+  function editing(){return document.activeElement===edit || document.activeElement===scratch || document.activeElement?.id==='noteTitle'}
+  // Never call element.scrollIntoView(): on iPhone that can pan the whole PWA
+  // and temporarily move the memo header outside the visible viewport.
+  function ensureCaretVisible(){
+    caretFrame=0;
+    if(!media.matches||!editing()||!keyboardOpen)return;
+    if(document.activeElement!==edit)return; // textarea has its own native caret scroller
+    const selection=window.getSelection();
+    if(!selection?.rangeCount||!selection.isCollapsed||!edit.contains(selection.anchorNode))return;
+    const r=selection.getRangeAt(0).cloneRange();
+    const rects=r.getClientRects();
+    const caret=rects.length?rects[rects.length-1]:r.getBoundingClientRect();
+    if(!caret||!Number.isFinite(caret.top))return;
+    const bounds=memoScroll.getBoundingClientRect();
+    const top=bounds.top+12,bottom=bounds.bottom-18;
+    if(bottom<=top)return;
+    if(caret.bottom>bottom) memoScroll.scrollTop+=caret.bottom-bottom+8;
+    else if(caret.top<top) memoScroll.scrollTop-=top-caret.top+8;
+  }
+  function scheduleCaret(){
+    if(!caretFrame)caretFrame=requestAnimationFrame(ensureCaretVisible);
+  }
   function updateMobileLayout(){
     frame=0;
-    if(media.matches){
-      // Keep the toolbar in the fixed-height main column, outside the text scroller.
-      if(toolbar.parentElement!==main)main.insertBefore(toolbar,memoScroll);
-      if(visual){
-        const baseline=document.documentElement.clientHeight || window.innerHeight;
-        const visible=Math.max(240,Math.round(visual.height));
-        // Apply a measured height only when a keyboard has substantially reduced the visual viewport.
-        if(visible<baseline-110){
-          document.documentElement.style.setProperty('--memo-mobile-viewport',visible+'px');
-        }else{
-          document.documentElement.style.removeProperty('--memo-mobile-viewport');
-        }
+    // Keep the toolbar outside the text scroller, just as on desktop.
+    if(toolbar.parentElement!==main)main.insertBefore(toolbar,memoScroll);
+    if(media.matches && visual){
+      const visible=Math.max(200,Math.round(visual.height));
+      const candidate=Math.max(window.innerHeight,document.documentElement.clientHeight);
+      if(visible>lastFullHeight-65)lastFullHeight=Math.max(lastFullHeight,candidate,visible);
+      const baseline=Math.max(lastFullHeight,candidate);
+      keyboardOpen=visible<baseline-110;
+      if(keyboardOpen){
+        document.documentElement.style.setProperty('--memo-mobile-viewport',visible+'px');
+        // Visual viewport can be panned by iOS when focusing deep in long notes.
+        document.documentElement.style.setProperty('--memo-mobile-visual-top',Math.max(0,Math.round(visual.offsetTop||0))+'px');
+      }else{
+        document.documentElement.style.removeProperty('--memo-mobile-viewport');
+        document.documentElement.style.removeProperty('--memo-mobile-visual-top');
       }
+      scheduleCaret();
     }else{
-      // Anchor tools inside the memo column so resizing the right pane cannot overlap it.
-      if(toolbar.parentElement!==main)main.insertBefore(toolbar,memoScroll);
+      keyboardOpen=false;
       document.documentElement.style.removeProperty('--memo-mobile-viewport');
+      document.documentElement.style.removeProperty('--memo-mobile-visual-top');
     }
   }
   function scheduleLayout(){
-    if(frame)return;
-    frame=requestAnimationFrame(updateMobileLayout);
+    if(!frame)frame=requestAnimationFrame(updateMobileLayout);
   }
   media.addEventListener?.('change',scheduleLayout);
   window.addEventListener('resize',scheduleLayout);
@@ -3704,8 +3786,15 @@ normalizeCategories(currentGenre().categories);if(!data.activeCategoryId)data.ac
   visual?.addEventListener('resize',scheduleLayout);
   visual?.addEventListener('scroll',scheduleLayout);
   document.addEventListener('focusin',e=>{
-    if(media.matches && e.target.closest('#editor,#noteTitle,#fontSize,#scratchText'))scheduleLayout();
+    if(!media.matches||!e.target.closest('#editor,#noteTitle,#scratchText'))return;
+    scheduleLayout();
+    // iOS emits several asynchronous keyboard/caret adjustments after focus.
+    for(const delay of [60,180,360,650])setTimeout(()=>{if(editing()){scheduleLayout();scheduleCaret()}},delay);
   });
+  document.addEventListener('selectionchange',scheduleCaret);
+  edit.addEventListener('input',scheduleCaret);
+  scratch.addEventListener('input',scheduleLayout);
+  document.addEventListener('focusout',()=>setTimeout(scheduleLayout,120));
   updateMobileLayout();
 })();
 
@@ -3856,7 +3945,7 @@ alignScratchHistory();
   document.addEventListener('touchstart',e=>{
     if(!mobile()||!isList()||e.touches.length!==1)return;
     const source=sourceFrom(e.target);
-    if(!source)return;
+    if(!source || source.type==='genre')return; // v6.14.14: genre icons use their separate options -> move interaction.
     cleanTimer();
     const t=e.touches[0];
     candidate={source,x:t.clientX,y:t.clientY,startX:t.clientX,startY:t.clientY,active:false,moved:false,hit:null};
@@ -3914,6 +4003,107 @@ alignScratchHistory();
       e.preventDefault();e.stopImmediatePropagation();
     }
   },true);
+})();
+
+/* TEST v6.14.14: one icon gesture = one action.
+   Hold opens the icon options only. Explicit "アイコンを移動" arms a
+   single drag, ending on drop; this is separate from category/note sorting. */
+(function initMobileIconActions(){
+  const icons=document.getElementById('genres');
+  const menu=document.getElementById('contextMenu');
+  const moveBtn=document.getElementById('moveGenreMobile');
+  const hint=document.getElementById('mobileIconMoveHint');
+  const cancelBtn=document.getElementById('mobileIconMoveCancel');
+  if(!icons||!menu||!moveBtn||!hint||!cancelBtn)return;
+  const mobile=()=>window.matchMedia('(max-width:800px)').matches;
+  let armed=-1,start=null,timer=null,blockClickUntil=0;
+  const clearTimer=()=>{if(timer!==null){clearTimeout(timer);timer=null}};
+  function iconAt(target){
+    const icon=target instanceof Element?target.closest('#genres .server'):null;
+    if(!icon||icon.classList.contains('add')||icon.classList.contains('settings'))return null;
+    return {el:icon,index:[...icons.querySelectorAll('.server:not(.add):not(.settings)')].indexOf(icon)};
+  }
+  function paint(){
+    icons.querySelectorAll('.server').forEach((node,i)=>node.classList.toggle('mobile-icon-move-source',mobile()&&armed===i));
+    hint.hidden=armed<0||!mobile();
+  }
+  function cancel(){armed=-1;start=null;clearTimer();paint();clearSortIndicators();document.body.classList.remove('mobile-icon-moving')}
+  window.cancelMobileIconMove=cancel;
+  moveBtn.addEventListener('click',e=>{
+    e.stopPropagation();
+    const index=Number(data._contextGenre);
+    closeAllMenus();
+    if(!mobile()||!Number.isInteger(index)||index<0||index>=data.genres.length)return;
+    armed=index;start=null;paint();
+  });
+  cancelBtn.addEventListener('click',cancel);
+  function showOptions(info,x,y){
+    if(!info||armed>=0)return;
+    blockClickUntil=performance.now()+750;
+    mobileGenreSuppressUntil=blockClickUntil;
+    closeAllMenus();
+    openContext(Math.max(72,x+10),Math.max(8,y-12),info.index);
+  }
+  icons.addEventListener('touchstart',e=>{
+    clearTimer();start=null;
+    if(!mobile()||!document.body.classList.contains('mobile-list')||e.touches.length!==1)return;
+    const info=iconAt(e.target);if(!info)return;
+    const t=e.touches[0];
+    if(armed>=0 && info.index!==armed)return;
+    start={info,x:t.clientX,y:t.clientY,moved:false,dragging:false,drop:null};
+    if(armed<0){
+      timer=setTimeout(()=>{
+        timer=null;
+        if(!start||start.moved)return;
+        showOptions(start.info,start.x,start.y);
+      },520);
+    }else{
+      document.body.classList.add('mobile-icon-moving');
+    }
+  },{passive:true});
+  icons.addEventListener('touchmove',e=>{
+    if(!start||e.touches.length!==1)return;
+    const t=e.touches[0];
+    const dx=t.clientX-start.x,dy=t.clientY-start.y;
+    if(Math.hypot(dx,dy)<9)return;
+    start.moved=true;clearTimer();
+    if(armed<0)return; // ordinary gesture must remain a vertical icon-list scroll
+    start.dragging=true;
+    if(e.cancelable)e.preventDefault();
+    e.stopImmediatePropagation();
+    icons.querySelectorAll('.server.drop-target').forEach(n=>n.classList.remove('drop-target'));
+    const info=iconAt(document.elementFromPoint(t.clientX,t.clientY));
+    start.drop=info&&info.index!==armed?info:null;
+    start.drop?.el.classList.add('drop-target');
+  },{passive:false});
+  function finish(e,canceled){
+    if(!start)return;
+    const state=start;start=null;clearTimer();
+    if(armed<0)return;
+    if(state.dragging){
+      if(e.cancelable)e.preventDefault();e.stopImmediatePropagation();
+      blockClickUntil=performance.now()+600;
+      mobileGenreSuppressUntil=blockClickUntil;
+      const from=armed,to=state.drop?.index;
+      cancel();
+      if(!canceled&&Number.isInteger(to))moveGenreByIndex(from,to);
+    }else{
+      document.body.classList.remove('mobile-icon-moving');
+    }
+  }
+  icons.addEventListener('touchend',e=>finish(e,false),{capture:true,passive:false});
+  icons.addEventListener('touchcancel',e=>finish(e,true),{capture:true,passive:false});
+  document.addEventListener('click',e=>{
+    if(!mobile()||performance.now()>blockClickUntil)return;
+    if(e.target.closest('#genres .server')){e.preventDefault();e.stopImmediatePropagation()}
+  },true);
+  icons.addEventListener('contextmenu',e=>{
+    if(!mobile())return;
+    const info=iconAt(e.target);if(!info)return;
+    e.preventDefault();e.stopImmediatePropagation();
+    if(armed<0&&!menu.classList.contains('show'))showOptions(info,e.clientX,e.clientY);
+  },true);
+  window.addEventListener('resize',()=>{if(!mobile())cancel()});
 })();
 
 /* v6.14.13: tables and drag-range move mode (test only).
