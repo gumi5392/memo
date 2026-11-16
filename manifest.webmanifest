@@ -1,7 +1,7 @@
 {
   "name": "メモ帳",
   "short_name": "メモ帳",
-  "description": "スマホとPCで使える共有メモ帳",
+  "description": "個人用の非公開メモ帳",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

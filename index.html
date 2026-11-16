@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#2f2419">
-<link rel="manifest" href="manifest.webmanifest?v=615">
-<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=615">
+<link rel="manifest" href="manifest.webmanifest?v=6160">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=6160">
 <title>メモ帳</title>
 <style>
 :root{
@@ -55,6 +55,9 @@ button{color:inherit}
 .note-title{width:100%;background:transparent;border:0;outline:0;color:#171512;font-size:29px;font-weight:750;margin:4px 0 18px}
 .editor{min-height:58vh;outline:0;line-height:1.8;font-size:16px;color:#24211d}
 .editor:empty:before{content:"ここにメモを書いてください…";color:#81796e}
+/* v6.14.13: Enter inserts one logical line, not a browser-default paragraph gap.
+   Preserve real empty lines (<p><br></p>) and spacing for headings/tables. */
+.editor > p{margin-block-start:0;margin-block-end:0}
 .editor img{max-width:100%;height:auto;border-radius:8px}
 .hint{margin-top:28px;color:#81796e;font-size:12px}
 .resize-handle{width:5px;cursor:col-resize;background:transparent;z-index:10}
@@ -303,6 +306,7 @@ body[data-theme="dark"] .composer-attach button:hover,body[data-theme="dark"] .c
 .app-update-settings{margin-top:18px;border-top:1px solid var(--line);padding-top:14px}
 .app-update-heading{display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:14px}
 #appBuildLabel{color:var(--muted);font-size:12px}
+.app-update-settings .app-update-environment{margin:2px 0 10px;color:var(--muted);font-size:11px;line-height:1.5}
 .app-update-settings p{font-size:12px;margin:9px 0 12px;line-height:1.5;color:var(--muted)}
 .app-update-actions{display:flex;gap:9px;flex-wrap:wrap}
 .app-update-actions button{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:9px 12px;color:var(--text);cursor:pointer}
@@ -362,7 +366,6 @@ body[data-theme="dark"] .color-choice{border-color:#202126;box-shadow:0 0 0 1px 
 
 
 .servers{border-left:0 solid transparent}
-@media(max-width:800px){.test-top-badge{padding:3px 6px;font-size:10px}.topbar .save{max-width:25%}}
 
 
 /* Test v6.7: editor placement, upward font menu, modal layering and iPhone keyboard */
@@ -517,7 +520,7 @@ body[data-theme="dark"] .create-name-modal .create-name-error{color:#ff9499}
   .topbar .save{display:none}
   .topbar .crumb{max-width:36vw}
 }
-@media(max-width:360px){.topbar .test-top-badge{display:none}}
+
 @media(max-width:800px) and (prefers-reduced-motion:reduce){.app>.main>.memo-workspace>.scratch-panel{transition-duration:.01ms!important}}
 
 /* TEST v6.11.1 — polished 雑メモ; the desktop note and its tools never overlap the panel. */
@@ -554,7 +557,10 @@ body[data-theme="dark"] .create-name-modal .create-name-error{color:#ff9499}
   .app>.main>.memo-workspace>.scratch-panel .scratch-content{padding:14px 15px calc(22px + env(safe-area-inset-bottom))}
   .app>.main>.memo-workspace>.memo-column>.editor-wrap{padding-top:14px}
 }
-/* TEST v6.14.4: independent memo edit history buttons. */
+/* TEST v6.14.13 — separate, non-destructive cloud verification feedback. */
+.sync-diagnostic-result{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;line-height:1.55;color:var(--muted);margin:8px 0 3px}
+
+/* TEST v6.14.6: independent memo edit history buttons. */
 .memo-history-btn{min-width:35px;font-family:Arial,sans-serif!important;font-size:23px!important;font-weight:650;line-height:1!important;padding:4px 7px!important}
 .memo-history-btn:disabled{opacity:.38;cursor:not-allowed!important}
 .memo-history-btn:not(:disabled):hover{background:var(--hover)!important}
@@ -604,7 +610,8 @@ body[data-theme="dark"] .create-name-modal .create-name-error{color:#ff9499}
 .conflict-sides textarea{margin-top:7px;width:100%;height:190px;resize:vertical;font-size:12px;line-height:1.5;border:1px solid var(--line);border-radius:7px;padding:10px;color:var(--text);background:var(--panel2)}
 .conflict-warning{color:var(--muted)}.conflict-actions{flex-wrap:wrap}
 @media(max-width:600px){.conflict-sides{grid-template-columns:1fr}.conflict-sides textarea{height:115px}.conflict-panel{padding:14px}}
-/* Stable v6.15.1: sortable icons and touch-safe rearranging. */
+
+/* v6.14.6: sortable icons and touch-safe rearranging. */
 #genres .server.sort-dragging,.cat-head.sort-dragging,.note.sort-dragging{opacity:.52}
 #genres .server.drop-target,.cat-head.drop-target,.note.drop-target{outline:2px dashed var(--accent);outline-offset:-2px}
 body.mobile-sort-active .servers .server,body.mobile-sort-active .cat-head,body.mobile-sort-active .note{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
@@ -612,6 +619,136 @@ body.mobile-sort-active .app>.sidebar .sidebar-body,body.mobile-sort-active .app
 @media(max-width:800px){
   #genres .server,.cat-head,.note{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-user-drag:none}
   #genres .server.sort-dragging,.cat-head.sort-dragging,.note.sort-dragging{filter:brightness(1.09);box-shadow:0 0 0 2px var(--accent) inset}
+}
+/* v6.14.13: Compact cells and drag-range selection for desktop move mode */
+.memo-insert-table-btn,.memo-move-mode-btn{white-space:nowrap}
+.memo-move-mode-btn[aria-pressed="true"]{background:#d0e7d6!important;border-color:#338f63!important;color:#125a3a!important}
+.memo-table{--memo-table-scale:1;position:relative;display:block;margin:14px 0 18px;width:640px;max-width:100%;vertical-align:top;user-select:text}
+.memo-table-frame{position:relative;border:1px solid #cbbfa8;border-radius:9px;overflow:hidden;background:#f4ecda}
+.memo-table table{width:100%;border-spacing:0;border-collapse:collapse;table-layout:fixed;line-height:1.4}
+.memo-table th,.memo-table td{position:relative;min-width:0;vertical-align:top;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;outline-offset:-2px;padding:calc(6px * var(--memo-table-scale)) calc(9px * var(--memo-table-scale));font-size:calc(14px * var(--memo-table-scale));border:1px solid #cfbea3}
+.memo-table th{background:#32935d;color:#fff;font-weight:700;text-align:left;border-color:#a1c4a4;padding-top:calc(6px * var(--memo-table-scale));padding-bottom:calc(6px * var(--memo-table-scale))}
+.memo-table th p,.memo-table td p,.memo-table th div,.memo-table td div{margin:0}
+.memo-table tbody tr:nth-child(odd) td{background:#f4eedf;color:#30271f}
+.memo-table tbody tr:nth-child(even) td{background:#eadfc6;color:#30271f}
+.memo-table td:focus,.memo-table th:focus{outline:2px solid #158a61}
+.memo-table-actions{display:flex;gap:7px;align-items:center;flex-wrap:wrap;min-height:40px;padding:7px 2px 0}
+.memo-table-actions button{background:var(--panel2);border:1px solid var(--line);color:var(--text);padding:6px 10px;border-radius:7px;font-size:12px;cursor:pointer}
+.memo-table-actions button:hover{background:var(--hover)}
+.memo-table-actions .table-remove{margin-left:auto;color:var(--danger);border-color:#bd918c;background:transparent}
+/* v6.14.17: compact, independent add/remove controls for table rows and columns. */
+.memo-table-stepper{display:inline-flex;align-items:stretch;overflow:hidden;border:1px solid var(--line);border-radius:8px;background:var(--panel2);min-height:36px}
+.memo-table-actions .memo-table-stepper button{min-width:36px;margin:0;padding:6px 10px;border:0;border-radius:0;background:transparent;font-weight:750;font-size:17px;line-height:1.15;touch-action:manipulation}
+.memo-table-actions .memo-table-stepper button:hover:not(:disabled){background:var(--hover)}
+.memo-table-actions .memo-table-stepper button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.memo-table-actions .memo-table-stepper button:disabled{opacity:.35;cursor:not-allowed}
+.memo-table-actions .memo-table-stepper .memo-table-stepper-minus{color:var(--danger)}
+.memo-table-stepper-label{display:flex;align-items:center;justify-content:center;min-width:30px;padding:0 7px;font-size:13px;font-weight:700;border-inline:1px solid var(--line);white-space:nowrap;user-select:none}
+
+.memo-table-resize{position:absolute;right:-4px;bottom:-4px;width:15px;height:15px;border-radius:4px;background:var(--accent);border:2px solid #f5efe2;cursor:nwse-resize;z-index:4;touch-action:none}
+/* v6.14.13: The width grip is a CSS pseudo-element, NOT a DOM child of
+   contenteditable <th>. A noneditable child inside an empty editing host
+   misplaces the insertion caret and makes Chromium keep an extra <br> on erase. */
+.memo-table th:not(:last-child)::after{content:'';position:absolute;right:-5px;top:0;bottom:0;width:10px;z-index:4;cursor:col-resize;touch-action:none;background:linear-gradient(to right,transparent calc(50% - 1px),#ffffff80 calc(50% - 1px),#ffffff80 calc(50% + 1px),transparent calc(50% + 1px));pointer-events:auto}
+.memo-table th:not(:last-child):hover::after{background:linear-gradient(to right,transparent calc(50% - 2px),#ffffff calc(50% - 2px),#ffffff calc(50% + 2px),transparent calc(50% + 2px))}
+.editor.memo-move-mode .memo-table th::after{display:none}
+.editor.memo-move-mode{position:relative;padding-left:37px;cursor:crosshair;-webkit-user-select:none;user-select:none}
+.editor.memo-move-mode .memo-move-line,.editor.memo-move-mode .memo-table{position:relative;min-height:1.7em;cursor:crosshair}
+.editor.memo-move-mode .memo-move-line{margin:0;white-space:normal}
+.editor.memo-move-mode .memo-move-line[data-move-selected="1"],.editor.memo-move-mode .memo-table[data-move-selected="1"]{background:#d2e8d5;outline:1px solid #6aa985;border-radius:5px}
+.memo-move-handle{position:absolute;left:2px;top:0;display:flex;align-items:center;justify-content:center;width:29px;height:32px;border-radius:7px;border:1px solid #70ab86;background:#d4e9d9;color:#166443;cursor:grab;user-select:none;touch-action:none;z-index:9;padding:0;box-shadow:0 1px 4px #183c2122}
+.memo-move-handle svg{width:18px;height:22px;pointer-events:none;stroke-width:2.2}
+.memo-move-handle:hover{background:#cfe5d6;color:#165d42;border-color:#69a587}
+.memo-drop-marker{height:3px;min-height:3px;border-radius:2px;background:#07845a;box-shadow:0 0 0 1px #fff;pointer-events:none;margin:0;position:absolute;left:37px;right:0;z-index:8}
+.memo-drop-marker::before{content:'';position:absolute;left:-5px;top:-4px;width:10px;height:10px;background:#07845a;border-radius:50%}
+.memo-move-help{color:var(--muted);font-size:12px;line-height:1.5;margin-top:4px}
+
+.editor.memo-move-mode .memo-table-actions,.editor.memo-move-mode .memo-col-resizer,.editor.memo-move-mode .memo-table-resize{display:none!important}
+body[data-theme="dark"] .memo-table-frame{border-color:#45504a;background:#222925}
+body[data-theme="dark"] .memo-table th{background:#176844;border-color:#407553}
+body[data-theme="dark"] .memo-table tbody tr:nth-child(odd) td{background:#2e332c;color:#e9e6db;border-color:#485044}
+body[data-theme="dark"] .memo-table tbody tr:nth-child(even) td{background:#363c32;color:#e9e6db;border-color:#485044}
+body[data-theme="dark"] .memo-move-handle{background:#254433;color:#d6f3df;border-color:#438962}
+body[data-theme="dark"] .editor.memo-move-mode [data-move-selected="1"]{background:#193c2e;outline-color:#388d67}
+@media(max-width:800px){
+  .memo-insert-table-btn,.memo-move-mode-btn,.memo-move-handle,.memo-col-resizer,.memo-table-resize{display:none!important}
+  .editor.memo-move-mode{padding-left:0}
+  .memo-table{width:100%!important;max-width:100%;margin:12px 0}
+  /* Safari auto-zooms focused contenteditable fields smaller than 16px. */
+  .memo-table th,.memo-table td{padding:5px 7px;font-size:16px!important;min-width:0;-webkit-text-size-adjust:100%}
+  .memo-table th::after{display:none}
+  .memo-table-actions{gap:8px}.memo-table-actions button{padding:7px;font-size:12px}
+  .memo-table-actions .memo-table-stepper button{min-width:40px;min-height:42px;font-size:19px;padding:7px 9px}
+  .memo-table-actions .memo-table-stepper-label{font-size:14px}
+  .memo-table-actions .table-remove{margin-left:0;min-height:42px}
+}
+
+#memoMoveTip[hidden]{display:none!important}
+#memoMoveTip{font-size:12px;color:#176548;background:#e0ecda;border:1px solid #c3dcc5;border-radius:8px;padding:9px 12px;margin:0 0 12px;line-height:1.55}
+body[data-theme="dark"] #memoMoveTip{background:#21362b;color:#bce0c7;border-color:#36684e}
+@media(max-width:800px){#memoMoveTip{display:none!important}}
+
+
+/* TEST v6.14.15–18: viewport-safe editing, native selection and icon actions. */
+.mobile-genre-move-action,.mobile-icon-move-hint{display:none!important}
+@media(max-width:800px){
+  html{-webkit-text-size-adjust:100%;}
+  /* Contain the app in iOS's *visible* viewport even after keyboard panning.
+     Only the memo and scratch text areas scroll; both title bars stay on top. */
+  .app,body.mobile-list .app{
+    position:fixed!important;left:0;right:0;top:0!important;
+    transform:translate3d(0,var(--memo-mobile-visual-top,0px),0);
+    height:var(--memo-mobile-viewport,100dvh)!important;
+    max-height:var(--memo-mobile-viewport,100dvh)!important;
+    min-height:0!important;overflow:hidden;
+  }
+  .app>.main{min-height:0;max-height:100%;}
+  .app>.main>.topbar{position:relative;z-index:16;flex:0 0 60px;min-height:60px;overflow:hidden;}
+  .app>.main>.memo-workspace{min-height:0;overflow:hidden;}
+  .app>.main>.memo-workspace>.memo-column,
+  .app>.main>.memo-workspace>.scratch-panel{min-height:0;max-height:100%;}
+  .app>.main>.memo-workspace>.memo-column>.editor-wrap{
+    flex:1 1 auto;min-height:0;overscroll-behavior-y:contain;
+    -webkit-overflow-scrolling:touch;overflow-y:auto;
+    padding-bottom:calc(20px + env(safe-area-inset-bottom));
+  }
+  /* Avoid a tall, old 58vh editing surface under the iOS keyboard. */
+  #editor{min-height:max(135px,calc(var(--memo-mobile-viewport,100dvh) - 160px));
+    -webkit-user-select:text;user-select:text;-webkit-touch-callout:default;touch-action:pan-y;}
+  .app>.main>.memo-workspace>.scratch-panel>.scratch-header{
+    position:relative;z-index:12;flex:0 0 60px;min-height:60px;
+  }
+  .scratch-content{min-height:0;flex:1 1 auto;overflow:hidden;padding-bottom:calc(12px + env(safe-area-inset-bottom));}
+  #scratchText{font-size:16px;min-height:0;max-height:100%;-webkit-user-select:text;user-select:text;-webkit-touch-callout:default;touch-action:pan-y;}
+  #noteTitle{font-size:24px;}
+  .mobile-menu-btn,.server,.cat-head,.note,.scratch-mobile-menu,.scratch-open-btn,.icon-btn{touch-action:manipulation;}
+  /* Do not turn off pinch zoom; prevent only unintentional element zoom. */
+  .modal input,.auth-panel input,.safe-dialog-input,.sync-modal input{font-size:max(16px,1em);}
+  #contextMenu .mobile-genre-move-action{display:none!important}
+  .mobile-icon-move-hint:not([hidden]){display:flex!important;align-items:center;gap:10px;justify-content:space-between;
+    position:fixed;left:75px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:85;
+    padding:9px 11px;background:var(--panel2);color:var(--text);border:1px solid var(--line);
+    border-radius:10px;box-shadow:0 5px 20px #0004;font-size:13px;font-weight:600;}
+  .mobile-icon-move-hint button{background:var(--bg);border:1px solid var(--line);color:var(--text);
+    border-radius:7px;padding:8px 11px;font-size:13px;}
+  #genres .server.mobile-icon-move-source{outline:3px solid var(--memo-emerald);outline-offset:2px;}
+  body.mobile-icon-moving #genres{touch-action:none;}
+  body.mobile-icon-moving #genres .server.mobile-icon-move-source{opacity:.65;}
+}
+
+/* TEST v6.14.16: keep the title bars outside the two text scrollers. */
+@media(max-width:800px){
+  .app>.main{overflow:hidden;overscroll-behavior:none;}
+  .app>.main>.topbar,
+  .app>.main>.memo-workspace>.scratch-panel>.scratch-header{
+    position:relative;flex-shrink:0;z-index:16;
+  }
+  .app>.main>.memo-workspace>.scratch-panel>.scratch-content{min-height:0;overflow:hidden;}
+  #scratchText{
+    flex:1 1 auto;height:100%;min-height:0;overflow-y:auto;
+    overscroll-behavior-y:contain;scroll-padding-block:18px;
+  }
+  #editor,#scratchText{touch-action:pan-y;}
 }
 </style>
 </head>
@@ -636,6 +773,10 @@ body.mobile-sort-active .app>.sidebar .sidebar-body,body.mobile-sort-active .app
   <span id="appUpdateBannerText">新しいバージョンがあります</span>
   <button type="button" id="appUpdateBannerApply">更新する</button>
   <button type="button" id="appUpdateBannerDismiss" aria-label="あとで">×</button>
+</div>
+<div class="mobile-icon-move-hint" id="mobileIconMoveHint" role="status" aria-live="polite" hidden>
+  <span>アイコンをドラッグして移動</span>
+  <button type="button" id="mobileIconMoveCancel">キャンセル</button>
 </div>
 <div class="app" id="app">
   <aside class="servers">
@@ -692,6 +833,8 @@ body.mobile-sort-active .app>.sidebar .sidebar-body,body.mobile-sort-active .app
           <button type="button" class="mobile-only" id="insertImageBtn">🖼 画像</button>
           <button type="button" class="mobile-only" id="insertVideoBtn">▶ 動画</button>
           <button type="button" class="desktop-only color-trigger" id="desktopColorBtn" aria-controls="desktopColorPalette" aria-expanded="false">色 ▾</button>
+          <button type="button" class="desktop-only memo-insert-table-btn" id="insertMemoTableBtn" title="メモ本文に編集可能な表を挿入する">▦ 表</button>
+          <button type="button" class="desktop-only memo-move-mode-btn" id="memoMoveModeBtn" aria-pressed="false" title="文章や表を並べ替える">↕ 移動</button>
           <input type="file" id="imageInput" accept="image/*" hidden><input type="file" id="videoInput" accept="video/*" hidden>
         </div>
         <div class="desktop-color-palette" id="desktopColorPalette" hidden>
@@ -701,6 +844,7 @@ body.mobile-sort-active .app>.sidebar .sidebar-body,body.mobile-sort-active .app
         </div>
       </div>
       <input class="note-title" id="noteTitle" value="">
+      <div id="memoMoveTip" hidden>ドラッグで移動したい行を選択してください。選択後、左側に表示される ↕ をドラッグすると移動できます。</div>
       <div class="editor" id="editor" contenteditable="true" spellcheck="false"></div>
       <div class="hint">編集内容は端末内に保存されます。共有メモ接続中はチャンネル単位でクラウドにも自動保存されます。</div>
     </div>
@@ -786,11 +930,13 @@ body.mobile-sort-active .app>.sidebar .sidebar-body,body.mobile-sort-active .app
       <button class="theme-option dark" id="themeDark"><span class="preview"><span class="p-side"></span><span class="p-main"></span></span><strong>ダーク</strong><span>これまでの配色</span></button>
     </div>
     <div class="app-update-settings" aria-live="polite">
-      <div class="app-update-heading"><strong>アプリの更新</strong><span id="appBuildLabel">v6.15.1</span></div>
+      <div class="app-update-heading"><strong>アプリの更新</strong><span id="appBuildLabel">v6.16.0</span></div>
       <p id="appUpdateStatus">更新情報を確認しています…</p>
+      <p id="appUpdateEnvironment" class="app-update-environment" aria-live="polite"></p>
       <div class="app-update-actions">
         <button type="button" id="appCheckUpdate">更新を確認</button>
         <button type="button" id="appApplyUpdate" hidden>最新版に更新</button>
+        <button type="button" id="appRefreshCurrent">このアプリを再読み込み</button>
       </div>
     </div>
     <div class="modal-actions"><button id="openSyncSettings">同期設定</button><button id="themeCancel">閉じる</button></div>
@@ -848,6 +994,7 @@ body.mobile-sort-active .app>.sidebar .sidebar-body,body.mobile-sort-active .app
     <label>パスワード</label>
     <input type="password" id="syncPassword" autocomplete="current-password">
     <div class="sync-status" id="syncStatus">未接続</div>
+    <p id="syncDiagnosticResult" class="sync-diagnostic-result" role="status" aria-live="polite"></p>
     <div class="modal-actions">
       <button id="syncClose">閉じる</button>
       <button id="syncSignUp">アカウント作成</button>
@@ -855,6 +1002,7 @@ body.mobile-sort-active .app>.sidebar .sidebar-body,body.mobile-sort-active .app
       <button id="syncInit" hidden>本番クラウドを初期登録</button>
       <button id="syncPush">クラウドへ保存</button>
       <button id="syncPull">同期を取得</button>
+      <button id="syncVerify">クラウドの保存内容を確認</button>
       <button id="syncConflictOpen">競合した内容を確認</button>
       <button id="syncLogout">ログアウト</button>
     </div>
@@ -1187,8 +1335,8 @@ function ensureCategoryState(){
 }
 let mobileGenreSuppressUntil=0;
 function attachMobileGenreLongPress(b,i){
-  // Touchscreen gesture is handled by the unified 400ms reorder handler.
-  // Stationary hold-release still opens this icon's context menu.
+  // Mobile uses the shared long-press reorder gesture instead. A stationary
+  // hold-and-release opens this icon's existing edit/delete context menu.
   if(window.matchMedia('(max-width:800px)').matches)return;
   let timer=null, start=null, fired=false;
   const cancel=()=>{if(timer!==null){clearTimeout(timer);timer=null}};
@@ -1215,6 +1363,7 @@ function attachMobileGenreLongPress(b,i){
     if(fired){e.preventDefault();e.stopPropagation();fired=false;}
   });
 }
+
 let dragGenreIndex=null;
 function moveGenreByIndex(from,to){
   if(!Number.isInteger(from)||!Number.isInteger(to)||from===to)return false;
@@ -1503,7 +1652,7 @@ function moveCategoryById(fromId,toId){
   const src=findCategoryInfo(fromId),dst=findCategoryInfo(toId);
   if(!src||!dst)return;
   for(let x=dst.node;x;){if(x.id===fromId)return;const info=findCategoryInfo(x.id);x=info?.parent}
-  // Preserve edits before the channel tree is rebuilt by drag-and-drop.
+  // Save in-progress text before dragging repaints the channel tree.
   saveCurrent();
   const snapshot=snapshotCategoryNotes();
   const node=src.node;
@@ -2274,6 +2423,7 @@ document.getElementById("syncClose").onclick=closeSyncSettings;
 document.getElementById("syncLogin").onclick=syncLogin;
 document.getElementById("syncSignUp").onclick=syncSignUp;
 document.getElementById("syncPull").onclick=pullCloud;
+document.getElementById("syncVerify").onclick=verifyCurrentCloudNote;
 document.getElementById("syncPush").onclick=()=>pushCloud();
 document.getElementById("syncLogout").onclick=syncLogout;
 document.getElementById("syncInit").onclick=initializeShared;
@@ -2290,9 +2440,9 @@ let cloudDirty=false;
 const sharedStatus=()=>document.getElementById('saveState');
 function syncCfg(){
  try{
-  // Read stable connection details to simplify setup; NEVER write its key.
+  // Use the existing production connection details; never select the test configuration.
   return JSON.parse(localStorage.getItem(SYNC_CFG_KEY)||'null')
-     || JSON.parse(localStorage.getItem('chromeMemoSyncConfig')||'null');
+
  }catch(e){return null}
 }
 function setSyncStatus(t){document.getElementById('syncStatus').textContent=t}
@@ -2354,7 +2504,7 @@ async function sharedRequest(method,path,body,prefer){
  if(r.status===401&&syncSession.refresh_token){
   const x=await fetch(normalizeSupabaseUrl(cfg.url)+'/auth/v1/token?grant_type=refresh_token',{
    method:'POST',headers:{apikey:cfg.key,'Content-Type':'application/json'},body:JSON.stringify({refresh_token:syncSession.refresh_token})});
-  if(x.ok){syncSession=await x.json();localStorage.setItem('chromeMemoSupabaseSession',JSON.stringify(syncSession));r=await make()}
+  if(x.ok){const refreshed=await x.json();syncSession={...refreshed,user:refreshed.user||syncSession.user};localStorage.setItem('chromeMemoSupabaseSession',JSON.stringify(syncSession));r=await make()}
  }
  if(!r.ok){let msg=await r.text();try{const j=JSON.parse(msg);msg=j.message||j.hint||msg}catch(e){}throw new Error('HTTP '+r.status+' '+msg.slice(0,160))}
  const t=await r.text();return t?JSON.parse(t):null;
@@ -2387,6 +2537,14 @@ const REMOTE_POLL_MS=2500;
 let pendingDrafts=new Map(), remoteConflicts=new Map();
 let sharedPullBusy=false, sharedSocket=null, sharedHeartbeat=null, sharedReconnect=null, sharedPullTimer=null;
 let sharedInitialEpoch=0, sharedSavingError=false, sharedRetryDelay=650;
+let cloudVerifiedOnThisSession=false, cloudIntegrityError='';
+function setSyncDiagnostic(text){document.getElementById('syncDiagnosticResult').textContent=text||''}
+function cloudVerificationFailed(message){
+  cloudVerifiedOnThisSession=false;
+  cloudIntegrityError=message||'クラウドの保存内容を検証できませんでした';
+  setSyncDiagnostic(cloudIntegrityError);
+  showSharedStatus('クラウド確認エラー：'+cloudIntegrityError);
+}
 function canonical(value){
   if(Array.isArray(value))return '['+value.map(canonical).join(',')+']';
   if(value&&typeof value==='object')return '{'+Object.keys(value).sort().filter(k=>value[k]!==undefined).map(k=>JSON.stringify(k)+':'+canonical(value[k])).join(',')+'}';
@@ -2468,7 +2626,9 @@ function updateSyncLabel(){
   if(sharedBusy){showSharedStatus('クラウドへ保存中…');return}
   if(!sharedEnabled){showSharedStatus('クラウド未接続');return}
   if(localSavePendingCount||pendingSaveCount){showSharedStatus('端末へ保存中…');return}
-  showSharedStatus('クラウド同期完了');
+  if(cloudIntegrityError){showSharedStatus('クラウド確認エラー：'+cloudIntegrityError);return}
+  if(!cloudVerifiedOnThisSession){showSharedStatus('クラウドを確認中…');return}
+  showSharedStatus('クラウド同期完了（確認済み）');
 }
 function detectSharedChanges(){
   if(!sharedEnabled)return;
@@ -2541,19 +2701,19 @@ function tryMergeIndependentNoteFields(id,row){
 }
 async function fetchSharedRows(){
   // Full download only on initial login/import; media may be embedded in payload.
-  const rows=await sharedRequest('GET','?select=doc_id,payload,version&order=doc_id.asc&limit=10000');
+  const rows=await sharedRequest('GET','?user_id=eq.'+encodeURIComponent(syncSession.user.id)+'&select=doc_id,payload,version&order=doc_id.asc&limit=10000');
   if(!Array.isArray(rows))throw new Error('クラウドの応答が不正です');
   if(rows.length>=10000)throw new Error('データ件数上限です。同期を停止しました');
   return new Map(rows.map(r=>[r.doc_id,r]));
 }
 async function fetchVersionHeaders(){
   // Poll ONLY tiny (doc_id, version) pairs. Never re-download full HTML/images every 2.5s.
-  const rows=await sharedRequest('GET','?select=doc_id,version&order=doc_id.asc&limit=10000');
+  const rows=await sharedRequest('GET','?user_id=eq.'+encodeURIComponent(syncSession.user.id)+'&select=doc_id,version&order=doc_id.asc&limit=10000');
   if(!Array.isArray(rows)||rows.length>=10000)throw new Error('同期一覧を取得できません');
   return rows;
 }
 async function fetchSharedRow(id){
-  const rows=await sharedRequest('GET','?doc_id=eq.'+encodeURIComponent(id)+'&select=doc_id,payload,version&limit=1');
+  const rows=await sharedRequest('GET','?user_id=eq.'+encodeURIComponent(syncSession.user.id)+'&doc_id=eq.'+encodeURIComponent(id)+'&select=doc_id,payload,version&limit=1');
   return rows?.[0]||null;
 }
 function restoreDurableDrafts(rows){
@@ -2614,6 +2774,7 @@ async function startShared(announce){
     document.getElementById('syncInit').hidden=true;
     // Fail safely if we cannot retain a snapshot of the existing production data.
     await saveOneTimeProductionBackup(rows);
+    cloudVerifiedOnThisSession=true;cloudIntegrityError='';
     sharedEnabled=true;sharedInitialized=true;
     memoHistories.clear();clearCategoryHistories();
     restoreDurableDrafts(rows);
@@ -2679,7 +2840,14 @@ async function pushSharedOne(id){
       else{registerConflict(id,row);throw new RemoteConflictError('別端末が先に更新しました')}
     }else newVersion=result[0].version;
   }
-  setBaseline(id,{version:newVersion,payload:draft});
+  const confirmed=await fetchSharedRow(id);
+  if(!confirmed || confirmed.version!==newVersion || canonical(normalizeDoc(id,confirmed.payload))!==canonical(draft)){
+    // Do not lose pending edits on an RLS mismatch, stale session or API mismatch.
+    cloudVerificationFailed('保存後の再取得で内容が一致しません（'+(id==='structure'?'構成':'メモ')+'）。端末の文章は保持しています。');
+    throw new Error('クラウドへの保存が確認できません。通信と権限を確認してください');
+  }
+  cloudVerifiedOnThisSession=true;cloudIntegrityError='';
+  setBaseline(id,confirmed);
   const latest=currentDoc(id);
   if(latest&&canonical(latest)===canonical(draft)){
     sharedDirty.delete(id);pendingDrafts.delete(id);
@@ -2760,6 +2928,33 @@ async function pollShared(){
   updateSyncLabel();
   if(sharedDirty.size&&!sharedConflict.size)queueCloudSync();
  }finally{sharedPullBusy=false}
+}
+// Read-only diagnostic for the currently open channel. This checks the REAL
+// remote row, not merely a successful HTTP request or a local saved state.
+async function verifyCurrentCloudNote(){
+  if(!sharedEnabled||!syncSession){setSyncDiagnostic('クラウドに未接続です。同期設定のログインを確認してください。');return}
+  saveCurrentWithoutCloud();detectSharedChanges();
+  const n=currentNote();
+  if(!n){setSyncDiagnostic('確認するチャンネルを開いてください。');return}
+  const id='note:'+n.id;
+  setSyncDiagnostic('クラウドの保存内容を確認中…');
+  try{
+    const [headers,row]=await Promise.all([fetchVersionHeaders(),fetchSharedRow(id)]);
+    if(!row){cloudVerificationFailed('このチャンネルのクラウドデータが見つかりません。クラウド件数 '+headers.length+' 件。');return}
+    const match=canonical(noteSnapshot(n))===canonical(normalizeDoc(id,row.payload));
+    if(!match){
+      cloudVerificationFailed('このチャンネルの本文がクラウドと一致しません。クラウド件数 '+headers.length+' 件。未同期 '+sharedDirty.size+' 件。');
+      return;
+    }
+    if(sharedDirty.has(id)){
+      // A previous upload may actually have landed; re-run normal reconciliation.
+      await pollShared();
+    }
+    if(!sharedDirty.size&&!sharedConflict.size)cloudIntegrityError='';
+    cloudVerifiedOnThisSession=true;
+    setSyncDiagnostic('クラウド確認：このチャンネルの本文が一致しました。クラウド件数 '+headers.length+' 件／メモの更新番号 '+row.version+'。');
+    updateSyncLabel();
+  }catch(e){cloudVerificationFailed('確認に失敗しました：'+e.message)}
 }
 async function pullCloud(){
  if(!sharedEnabled){await startShared(true);return}
@@ -2904,7 +3099,10 @@ document.getElementById('gatePassword').addEventListener('keydown',e=>{if(e.key=
 initSupabase();
 if('serviceWorker' in navigator){
  window.addEventListener('load',()=>{
-   navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{});
+   const appRoot=new URL('./',location.href);
+   navigator.serviceWorker.register(new URL('sw.js',appRoot).href,{
+     scope:appRoot.pathname,updateViaCache:'none'
+   }).then(r=>r.update()).catch(e=>console.warn('安定版の更新確認を保留:',e));
  });
 }
 // Prepare the IndexedDB migration without overwriting a newer cache with defaults.
@@ -3182,6 +3380,7 @@ normalizeCategories(currentGenre().categories);if(!data.activeCategoryId)data.ac
       if(view!=='memo')document.activeElement?.blur?.();
       document.body.classList.toggle('mobile-list',view==='list');
       document.body.classList.toggle('mobile-scratch',view==='scratch');
+      if(view!=='list')window.cancelMobileIconMove?.();
       app.classList.remove('nav-dragging');app.style.removeProperty('--nav-offset');
       document.getElementById('scratchPanel').style.removeProperty('transform');
     }
@@ -3205,9 +3404,14 @@ normalizeCategories(currentGenre().categories);if(!data.activeCategoryId)data.ac
     app.addEventListener('touchstart',e=>{
       gesture=null;
       if(!mobile() || doubleSlideTimer || e.touches.length!==1 || e.target.closest('button, input, select, video, .media-resize'))return;
-      // Text selection takes priority over swiping inside an actively edited textarea.
-      if(e.target.closest('textarea')&&document.activeElement===e.target)return;
-      const t=e.touches[0];gesture={x:t.clientX,y:t.clientY,time:performance.now(),view:getView(),mode:null,last:0};
+      // Native caret dragging, long-press selection and text editing always win over
+      // the app's horizontal navigation. This covers both memo and scratch editors.
+      const editable=e.target.closest('#editor,#scratchText,#noteTitle,[contenteditable],textarea');
+      // Allow deliberate horizontal swipes from text areas, but never capture
+      // a stationary selection hold, selection-handle drag or vertical scroll.
+      const selected=window.getSelection();
+      if(editable && (selected && !selected.isCollapsed && selected.toString().length))return;
+      const t=e.touches[0];gesture={x:t.clientX,y:t.clientY,time:performance.now(),view:getView(),mode:null,last:0,editable:!!editable};
     },{passive:true});
     app.addEventListener('touchmove',e=>{
       if(!gesture||!mobile()||e.touches.length!==1)return;
@@ -3215,6 +3419,12 @@ normalizeCategories(currentGenre().categories);if(!data.activeCategoryId)data.ac
       if(gesture.mode==='vertical')return;
       if(!gesture.mode){
         if(Math.max(Math.abs(dx),Math.abs(dy))<9)return;
+        if(gesture.editable && (performance.now()-gesture.time>260 ||
+           Math.abs(dx)<16 || Math.abs(dx)<Math.abs(dy)*1.55 ||
+           (window.getSelection()?.toString()?.length>0))){
+          if(performance.now()-gesture.time>260 || Math.abs(dy)>Math.abs(dx)){gesture.mode='vertical';}
+          return;
+        }
         if(Math.abs(dy)>Math.abs(dx)*1.15){gesture.mode='vertical';return}
         const allowed=(gesture.view==='list'&&dx<0)||(gesture.view==='memo'&&dx!==0)||(gesture.view==='scratch'&&dx>0);
         if(!allowed){gesture.mode='vertical';return}
@@ -3277,32 +3487,50 @@ normalizeCategories(currentGenre().categories);if(!data.activeCategoryId)data.ac
  setExpanded(open);
 })();
 
-/* v6.5: PWA update detection + user-initiated safe refresh. */
+/* PRODUCTION v6.16.0: Safe iPhone home-screen PWA updates (no icon re-add). */
 (function(){
  'use strict';
- const INSTALLED_BUILD='6.15.1';
- const intervalMs=10*60*1000;
+ const INSTALLED_BUILD='6.16.0';
+ const CHECK_INTERVAL_MS=3*60*1000;
  const status=document.getElementById('appUpdateStatus');
  const buildLabel=document.getElementById('appBuildLabel');
+ const environment=document.getElementById('appUpdateEnvironment');
  const checkButton=document.getElementById('appCheckUpdate');
  const updateButton=document.getElementById('appApplyUpdate');
+ const refreshButton=document.getElementById('appRefreshCurrent');
  const banner=document.getElementById('appUpdateBanner');
  const bannerText=document.getElementById('appUpdateBannerText');
  const bannerApply=document.getElementById('appUpdateBannerApply');
  const dismiss=document.getElementById('appUpdateBannerDismiss');
- const appRoot=new URL('./',document.baseURI);
+ const appRoot=new URL('./',location.href);
+ const isStandalone=window.navigator.standalone===true ||
+   !!window.matchMedia?.('(display-mode: standalone)')?.matches;
+ const expectedKey='memo-production-update-expected-v616';
  let remoteBuild=null,checking=null,lastCheck=0,bannerDismissedBuild=null,updating=false;
  buildLabel.textContent='v'+INSTALLED_BUILD;
+ const setStatus=text=>{status.textContent=text;};
  const compare=(a,b)=>{
-   const as=String(a).split('.').map(x=>parseInt(x,10)||0),bs=String(b).split('.').map(x=>parseInt(x,10)||0);
+   const as=String(a).split('.').map(x=>parseInt(x,10)||0);
+   const bs=String(b).split('.').map(x=>parseInt(x,10)||0);
    for(let i=0;i<Math.max(as.length,bs.length);i++){
      if((as[i]||0)!==(bs[i]||0))return (as[i]||0)>(bs[i]||0)?1:-1;
    }
    return 0;
  };
- const setStatus=t=>{status.textContent=t;};
+ const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+ const addNonce=url=>{
+   const result=new URL(url,appRoot);
+   result.searchParams.set('_fresh',String(Date.now())+'-'+Math.floor(Math.random()*1000000));
+   return result;
+ };
+ const setEnvironment=extra=>{
+   environment.textContent=(isStandalone?'起動モード：ホーム画面版':'起動モード：ブラウザ版')+
+     ' ／ 動作中：v'+INSTALLED_BUILD+(extra?' ／ '+extra:'');
+ };
+ setEnvironment('更新を確認します');
  const showNew=build=>{
    remoteBuild=build;
+   setEnvironment('配信中：v'+build);
    setStatus('新しいバージョン v'+build+' が使えます。');
    updateButton.hidden=false;
    if(bannerDismissedBuild!==build){
@@ -3312,81 +3540,145 @@ normalizeCategories(currentGenre().categories);if(!data.activeCategoryId)data.ac
  };
  const showCurrent=()=>{
    remoteBuild=null;updateButton.hidden=true;banner.hidden=true;
-   setStatus('最新版です（v'+INSTALLED_BUILD+'）。');
+   setEnvironment('配信中：v'+INSTALLED_BUILD);
+   setStatus('最新版です（v'+INSTALLED_BUILD+'）。再読み込みもできます。');
  };
+ async function fetchBuildInfo(){
+   const url=addNonce('version.json');
+   const response=await fetch(url.href,{cache:'no-store'});
+   if(!response.ok)throw new Error('バージョン情報 HTTP '+response.status);
+   const body=await response.json();
+   if(body.channel && body.channel!=='production' && body.channel!=='stable')throw new Error('安定版以外の更新情報を検出しました');
+   const build=String(body.build||body.version||'').replace(/^v/i,'');
+   if(!/^\d+(?:\.\d+){0,2}$/.test(build))throw new Error('バージョン情報が不正です');
+   return build;
+ }
+ async function fetchActualHtmlBuild(){
+   // Do not trust version.json alone: GitHub Pages may serve an older HTML file
+   // briefly, or an iOS service worker may return a stale HTML response.
+   const response=await fetch(addNonce('index.html').href,{cache:'no-store'});
+   if(!response.ok)throw new Error('更新ファイル HTTP '+response.status);
+   const html=await response.text();
+   const found=html.match(/const\s+INSTALLED_BUILD\s*=\s*['"](\d+(?:\.\d+){0,2})['"]/);
+   if(!found)throw new Error('配信中のHTMLからバージョンを検証できません');
+   return found[1];
+ }
  async function check(force=false){
    if(checking)return checking;
-   if(!force && Date.now()-lastCheck<60000)return;
+   if(!force && Date.now()-lastCheck<45000)return;
    checking=(async()=>{
      checkButton.disabled=true;
      setStatus('更新を確認しています…');
      try{
-       const url=new URL('version.json',appRoot);
-       url.searchParams.set('_check',String(Date.now()));
-       const response=await fetch(url.href,{cache:'no-store',headers:{'Cache-Control':'no-cache'}});
-       if(!response.ok)throw new Error('HTTP '+response.status);
-       const body=await response.json();
-       const latest=String(body.build||body.version||'').replace(/^v/i,'');
-       if(!/^\d+(?:\.\d+){0,2}$/.test(latest))throw new Error('バージョン情報が不正です');
+       const declared=await fetchBuildInfo();
        lastCheck=Date.now();
-       if(compare(latest,INSTALLED_BUILD)>0)showNew(latest);
-       else showCurrent();
-       return latest;
+       if(compare(declared,INSTALLED_BUILD)>0){
+         const actual=await fetchActualHtmlBuild();
+         if(compare(actual,declared)<0){
+           remoteBuild=null;updateButton.hidden=true;banner.hidden=true;
+           setEnvironment('更新ファイル反映待ち');
+           setStatus('新しいバージョンの配信を確認中です。少し後に「更新を確認」を押してください。');
+         }else showNew(actual);
+       }else showCurrent();
+       return declared;
      }catch(e){
-       setStatus('更新確認に失敗しました。ネット接続を確認して再試行してください。');
-       // Do not hide a previously detected new version just because a later check failed.
+       setStatus('更新確認ができませんでした：'+(e.message||'通信エラー')+'。');
        return null;
      }finally{checkButton.disabled=false;checking=null;}
    })();
    return checking;
  }
- const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
- async function update(){
-   if(updating)return;
-   updating=true;
-   updateButton.disabled=true;bannerApply.disabled=true;
-   setStatus('保存状況を確認しています…');
+ async function waitForLocalWrites(){
+   const until=Date.now()+15000;
+   while((localSavePendingCount||pendingSaveCount||sharedBusy) && Date.now()<until)await sleep(100);
+   if(localSavePendingCount||pendingSaveCount||sharedBusy)
+     throw new Error('保存処理が続いています。同期を確認してからもう一度試してください。');
+   if(localMemoSaveError||sharedSavingError)
+     throw new Error('端末保存でエラーが発生しています。文章をコピーしてから確認してください。');
+ }
+ async function ensureSafeToReload(){
+   // Never erase localStorage / IndexedDB. Saving before navigation only matters
+   // if the cloud session was opened successfully in this app instance.
+   if(!document.body.classList.contains('auth-ready'))return;
+   if(typeof sharedEnabled==='undefined'||!sharedEnabled||!syncSession)
+     throw new Error('クラウド未接続のため更新を保留しました。同期設定をご確認ください。');
+   if(typeof saveCurrent==='function')saveCurrent();
+   await waitForLocalWrites();
+   if(sharedConflict.size)throw new Error('同期の競合があります。内容を確認してから更新してください。');
+   const ok=await pushCloud();
+   await waitForLocalWrites();
+   if(!ok||sharedDirty.size||sharedConflict.size||cloudDirty||pendingDrafts.size||
+      cloudIntegrityError||!cloudVerifiedOnThisSession){
+     throw new Error('未同期の変更またはクラウド確認エラーがあります。更新せず端末内の文章を保持しました。');
+   }
+ }
+ async function refreshWorker(){
+   if(!('serviceWorker' in navigator))return;
+   // Keep the registration. Unregistering can strand an existing home-screen
+   // shortcut with a stale process and makes offline startup unreliable.
    try{
-     // If the user is logged in, wait for cloud commits before unloading the editor.
-     if(document.body.classList.contains('auth-ready')){
-       if(typeof saveCurrent==='function')saveCurrent();
-       if(typeof sharedEnabled==='undefined'||!sharedEnabled)throw new Error('クラウド未接続のため更新を中止しました。同期を確認してください。');
-       let deadline=Date.now()+12000;
-       while(sharedBusy && Date.now()<deadline)await wait(120);
-       if(sharedBusy)throw new Error('保存処理中です。少し待ってからもう一度試してください。');
-       const ok=await pushCloud();
-       if(!ok||sharedDirty.size||sharedConflict.size||cloudDirty)throw new Error('未保存のメモまたは競合があります。同期完了後に更新してください。');
-     }
-     setStatus('最新版を読み込む準備をしています…');
-     if('serviceWorker' in navigator){
-       try{
-         const reg=await navigator.serviceWorker.getRegistration(location.href);
-         if(reg)await reg.unregister();
-       }catch(e){/* cache-busted navigation is still attempted */}
-     }
+     const reg=await navigator.serviceWorker.register(new URL('sw.js',appRoot).href,{
+       scope:appRoot.pathname,updateViaCache:'none'
+     });
+     await Promise.race([reg.update(),sleep(4000)]);
+   }catch(e){console.warn('Service Worker の更新はブラウザへ委ねます:',e)}
+ }
+ async function applyUpdate(reloadSameBuild=false){
+   if(updating)return;
+   updating=true;updateButton.disabled=true;bannerApply.disabled=true;refreshButton.disabled=true;
+   setStatus('未同期の文章と保存状態を確認しています…');
+   try{
+     await ensureSafeToReload();
+     setStatus('最新版のファイルを確認しています…');
+     const actual=await fetchActualHtmlBuild();
+     const required=reloadSameBuild?INSTALLED_BUILD:(remoteBuild||INSTALLED_BUILD);
+     if(compare(actual,required)<0)
+       throw new Error('HTMLの配信がまだ更新されていません。後でもう一度試してください。');
+     if(!reloadSameBuild && compare(actual,INSTALLED_BUILD)<=0)
+       throw new Error('新しいバージョンを検出できませんでした。更新を確認してください。');
+     await refreshWorker();
+     // Delete ONLY caches created for the production app, NEVER test app caches.
      if('caches' in window){
        try{
          const keys=await caches.keys();
-         await Promise.all(keys.filter(k=>/^(?:sf6memo|chrome[-_]?memo|memo[-_]?app|memo[-_]?cache)/i.test(k)).map(k=>caches.delete(k)));
-       }catch(e){}
+         await Promise.all(keys.filter(key=>key.startsWith('memo-production-only-')).map(key=>caches.delete(key)));
+       }catch(e){console.warn('本番用キャッシュの掃除を保留:',e)}
      }
-     const dest=new URL('index.html',appRoot);
-     dest.searchParams.set('memo_update',String(Date.now()));
-     dest.searchParams.set('v',remoteBuild||INSTALLED_BUILD);
+     try{sessionStorage.setItem(expectedKey,actual)}catch(e){}
+     setStatus('アプリを安全に再読み込みします…');
+     const dest=addNonce('index.html');
+     dest.searchParams.set('memo_update',actual);
      location.replace(dest.href);
    }catch(e){
-     setStatus(e.message||'更新できませんでした。');
-     updating=false;updateButton.disabled=false;bannerApply.disabled=false;
+     setStatus('更新を保留しました：'+(e.message||'確認エラー'));
+     updating=false;updateButton.disabled=false;bannerApply.disabled=false;refreshButton.disabled=false;
    }
  }
  checkButton.addEventListener('click',()=>check(true));
- updateButton.addEventListener('click',update);
- bannerApply.addEventListener('click',update);
+ updateButton.addEventListener('click',()=>applyUpdate(false));
+ bannerApply.addEventListener('click',()=>applyUpdate(false));
+ refreshButton.addEventListener('click',()=>applyUpdate(true));
  dismiss.addEventListener('click',()=>{bannerDismissedBuild=remoteBuild;banner.hidden=true;});
- // App updates remain opt-in, so editing is never interrupted by a forced reload.
- window.addEventListener('load',()=>setTimeout(()=>check(true),1200),{once:true});
- document.addEventListener('visibilitychange',()=>{if(!document.hidden)check(false);});
- window.setInterval(()=>{if(!document.hidden)check(false)},intervalMs);
+ // A successful reload must run the NEW HTML, not just change the displayed label.
+ try{
+   const expected=sessionStorage.getItem(expectedKey);
+   if(expected){
+     sessionStorage.removeItem(expectedKey);
+     if(compare(INSTALLED_BUILD,expected)>=0){
+       setStatus('v'+INSTALLED_BUILD+' を読み込みました。メモデータは保持されています。');
+     }else{
+       setStatus('旧版が読み込まれました。もう一度「更新を確認」を押してください。');
+     }
+   }
+ }catch(e){}
+ // Check on launch, foreground resume, network reconnect and periodically;
+ // never force navigation while somebody may be typing.
+ window.addEventListener('load',()=>check(true),{once:true});
+ window.addEventListener('pageshow',event=>{if(event.persisted)check(true)});
+ document.addEventListener('visibilitychange',()=>{if(!document.hidden)check(true)});
+ window.addEventListener('focus',()=>check(false));
+ window.addEventListener('online',()=>check(true));
+ window.setInterval(()=>{if(!document.hidden)check(false)},CHECK_INTERVAL_MS);
 })();
 
 
@@ -3422,31 +3714,136 @@ normalizeCategories(currentGenre().categories);if(!data.activeCategoryId)data.ac
   const main=document.getElementById('memoColumn');
   const media=window.matchMedia('(max-width:800px)');
   const visual=window.visualViewport;
-  let frame=0;
+  const edit=document.getElementById('editor');
+  const scratch=document.getElementById('scratchText');
+  let frame=0,caretFrame=0,keyboardOpen=false;
+  let lastFullHeight=Math.max(window.innerHeight,document.documentElement.clientHeight,visual?.height||0);
+  // Table cells are independent contenteditable hosts inside a non-editable
+  // wrapper. They do not make #editor the activeElement on iOS Safari.
+  const tableCellSelector='.memo-table th[contenteditable="true"],.memo-table td[contenteditable="true"]';
+  function activeTableCell(){
+    const focused=document.activeElement;
+    return focused?.matches?.(tableCellSelector) && edit.contains(focused) ? focused : null;
+  }
+  function editing(){return document.activeElement===edit || document.activeElement===scratch || document.activeElement?.id==='noteTitle' || !!activeTableCell()}
+  // iOS does not always scroll the internal textarea when the keyboard opens.
+  // Measure the selected insertion point in a temporary text-layout mirror and
+  // adjust only textarea.scrollTop (never the page or the outer panel).
+  function keepScratchCaretVisible(){
+    if(!keyboardOpen||document.activeElement!==scratch)return;
+    if(scratch.selectionStart!==scratch.selectionEnd)return; // preserve selection gestures
+    const pos=scratch.selectionStart;
+    const style=getComputedStyle(scratch);
+    const width=scratch.getBoundingClientRect().width;
+    if(width<40||scratch.clientHeight<45)return;
+    const mirror=document.createElement('div');
+    mirror.setAttribute('aria-hidden','true');
+    Object.assign(mirror.style,{
+      position:'absolute',left:'-20000px',top:'0',visibility:'hidden',
+      pointerEvents:'none',boxSizing:'border-box',margin:'0',height:'auto',
+      width:width+'px',borderStyle:'solid',borderColor:'transparent',
+      whiteSpace:'pre-wrap',overflowWrap:'break-word',overflow:'hidden'
+    });
+    for(const key of ['fontFamily','fontSize','fontWeight','fontStyle','lineHeight',
+      'letterSpacing','wordSpacing','textAlign','textIndent','textTransform',
+      'direction','tabSize','wordBreak','paddingTop','paddingRight',
+      'paddingBottom','paddingLeft','borderTopWidth','borderRightWidth',
+      'borderBottomWidth','borderLeftWidth'])mirror.style[key]=style[key];
+    // A zero-width character also measures the caret following a final newline.
+    mirror.appendChild(document.createTextNode(scratch.value.slice(0,pos)));
+    const marker=document.createElement('span');
+    marker.textContent='\u200b';
+    mirror.appendChild(marker);
+    document.body.appendChild(mirror);
+    const caretTop=marker.getBoundingClientRect().top-mirror.getBoundingClientRect().top;
+    mirror.remove();
+    if(!Number.isFinite(caretTop))return;
+    const lineHeight=parseFloat(style.lineHeight)||parseFloat(style.fontSize)*1.8;
+    const padTop=parseFloat(style.paddingTop)||0;
+    const padBottom=parseFloat(style.paddingBottom)||0;
+    const visibleTop=scratch.scrollTop+padTop+9;
+    const visibleBottom=scratch.scrollTop+scratch.clientHeight-padBottom-lineHeight-14;
+    if(caretTop>visibleBottom){
+      scratch.scrollTop+=caretTop-visibleBottom;
+    }else if(caretTop<visibleTop){
+      scratch.scrollTop-=visibleTop-caretTop;
+    }
+  }
+  // Never call element.scrollIntoView(): on iPhone that can pan the whole PWA
+  // and temporarily move the memo header outside the visible viewport.
+  function ensureCaretVisible(){
+    caretFrame=0;
+    if(!media.matches||!editing()||!keyboardOpen)return;
+    if(document.activeElement===scratch){
+      keepScratchCaretVisible();
+      return;
+    }
+    const cell=activeTableCell();
+    if(document.activeElement!==edit&&!cell)return;
+    const selection=window.getSelection();
+    // Do not move the document during text-range selection or a long press.
+    if(!selection?.rangeCount||!selection.isCollapsed)return;
+    const host=cell||edit;
+    if(!host.contains(selection.anchorNode))return;
+    const r=selection.getRangeAt(0).cloneRange();
+    const rects=r.getClientRects();
+    let caret=rects.length?rects[rects.length-1]:r.getBoundingClientRect();
+    // On iOS an empty contenteditable table cell can give a zero-size range.
+    // Fall back to that cell's actual bounds, not the whole table or editor.
+    if(cell){
+      const cellRect=cell.getBoundingClientRect();
+      if(!caret||!Number.isFinite(caret.top)||caret.height<1 ||
+         caret.bottom<cellRect.top-2 || caret.top>cellRect.bottom+2){
+        caret=cellRect;
+      }
+    }
+    if(!caret||!Number.isFinite(caret.top))return;
+    const bounds=memoScroll.getBoundingClientRect();
+    const top=bounds.top+12,bottom=bounds.bottom-18;
+    if(bottom<=top)return;
+    // Only scroll the memo's own container. Scrolling the page/ancestor would
+    // pull the fixed channel header off-screen when the keyboard appears.
+    if(caret.bottom>bottom) memoScroll.scrollTop+=caret.bottom-bottom+8;
+    else if(caret.top<top) memoScroll.scrollTop-=top-caret.top+8;
+  }
+  function scheduleCaret(){
+    if(!caretFrame)caretFrame=requestAnimationFrame(ensureCaretVisible);
+  }
   function updateMobileLayout(){
     frame=0;
-    if(media.matches){
-      // Keep the toolbar in the fixed-height main column, outside the text scroller.
-      if(toolbar.parentElement!==main)main.insertBefore(toolbar,memoScroll);
-      if(visual){
-        const baseline=document.documentElement.clientHeight || window.innerHeight;
-        const visible=Math.max(240,Math.round(visual.height));
-        // Apply a measured height only when a keyboard has substantially reduced the visual viewport.
-        if(visible<baseline-110){
-          document.documentElement.style.setProperty('--memo-mobile-viewport',visible+'px');
-        }else{
-          document.documentElement.style.removeProperty('--memo-mobile-viewport');
+    // Keep the toolbar outside the text scroller, just as on desktop.
+    if(toolbar.parentElement!==main)main.insertBefore(toolbar,memoScroll);
+    if(media.matches && visual){
+      const visible=Math.max(200,Math.round(visual.height));
+      const candidate=Math.max(window.innerHeight,document.documentElement.clientHeight);
+      if(visible>lastFullHeight-65)lastFullHeight=Math.max(lastFullHeight,candidate,visible);
+      const baseline=Math.max(lastFullHeight,candidate);
+      keyboardOpen=visible<baseline-110;
+      if(keyboardOpen){
+        // Resize the inner scroll areas but do not reflow the header's top offset.
+        const viewportSize=visible+'px';
+        if(document.documentElement.style.getPropertyValue('--memo-mobile-viewport')!==viewportSize){
+          document.documentElement.style.setProperty('--memo-mobile-viewport',viewportSize);
         }
+        // Compensate for a visual-viewport pan via compositor translation instead
+        // of changing the app's layout top, which caused the title bar to jump.
+        const panTop=Math.max(0,Math.round(visual.offsetTop||0))+'px';
+        if(document.documentElement.style.getPropertyValue('--memo-mobile-visual-top')!==panTop){
+          document.documentElement.style.setProperty('--memo-mobile-visual-top',panTop);
+        }
+      }else{
+        document.documentElement.style.removeProperty('--memo-mobile-viewport');
+        document.documentElement.style.removeProperty('--memo-mobile-visual-top');
       }
+      scheduleCaret();
     }else{
-      // Anchor tools inside the memo column so resizing the right pane cannot overlap it.
-      if(toolbar.parentElement!==main)main.insertBefore(toolbar,memoScroll);
+      keyboardOpen=false;
       document.documentElement.style.removeProperty('--memo-mobile-viewport');
+      document.documentElement.style.removeProperty('--memo-mobile-visual-top');
     }
   }
   function scheduleLayout(){
-    if(frame)return;
-    frame=requestAnimationFrame(updateMobileLayout);
+    if(!frame)frame=requestAnimationFrame(updateMobileLayout);
   }
   media.addEventListener?.('change',scheduleLayout);
   window.addEventListener('resize',scheduleLayout);
@@ -3454,8 +3851,39 @@ normalizeCategories(currentGenre().categories);if(!data.activeCategoryId)data.ac
   visual?.addEventListener('resize',scheduleLayout);
   visual?.addEventListener('scroll',scheduleLayout);
   document.addEventListener('focusin',e=>{
-    if(media.matches && e.target.closest('#editor,#noteTitle,#fontSize,#scratchText'))scheduleLayout();
+    if(!media.matches||!e.target.closest('#editor,#noteTitle,#scratchText'))return;
+    scheduleLayout();
+    // iOS emits several asynchronous keyboard/caret adjustments after focus.
+    for(const delay of [60,180,360,650,900])setTimeout(()=>{
+      if(editing()){
+        scheduleLayout();
+        // Run after the pending viewport layout has been applied.
+        requestAnimationFrame(scheduleCaret);
+      }
+    },delay);
   });
+  document.addEventListener('selectionchange',scheduleCaret);
+  edit.addEventListener('input',scheduleCaret);
+  scratch.addEventListener('input',()=>{scheduleLayout();scheduleCaret()});
+  // Recheck table cells after tapping an already-focused cell, switching cells,
+  // Enter and IME commits. focusin + visualViewport.resize alone are insufficient
+  // on iPhone, and the existing editor input handler already covers typing.
+  for(const eventName of ['click','keyup','touchend','compositionend']){
+    edit.addEventListener(eventName,e=>{
+      if(!e.target.closest?.(tableCellSelector))return;
+      scheduleCaret();
+      if(eventName==='touchend')requestAnimationFrame(scheduleCaret);
+    });
+  }
+  // A tap inside an already-focused textarea can move the caret without input.
+  // Recheck it after native iOS selection and keyboard animations have settled.
+  for(const eventName of ['click','keyup','select','touchend','compositionend']){
+    scratch.addEventListener(eventName,()=>{
+      scheduleCaret();
+      if(eventName==='touchend')requestAnimationFrame(scheduleCaret);
+    });
+  }
+  document.addEventListener('focusout',()=>setTimeout(scheduleLayout,120));
   updateMobileLayout();
 })();
 
@@ -3542,7 +3970,8 @@ document.addEventListener('keydown',e=>{
   else if(key==='y'||(key==='z'&&e.shiftKey)){e.preventDefault();redoScratchEdit();}
 },true);
 alignScratchHistory();
-/* Stable v6.15.1: mobile long-press sorting (icons / categories / channels).
+
+/* v6.14.6: mobile long-press sorting (icons / categories / channels).
    Hold ≈400ms before moving. Normal taps, vertical scroll and horizontal
    panel swipe work as before. Do not reinterpret category hierarchy on drop. */
 (function initMobileListSorting(){
@@ -3605,7 +4034,7 @@ alignScratchHistory();
   document.addEventListener('touchstart',e=>{
     if(!mobile()||!isList()||e.touches.length!==1)return;
     const source=sourceFrom(e.target);
-    if(!source)return;
+    if(!source || source.type==='genre')return; // v6.14.14: genre icons use hold-to-drag interaction.
     cleanTimer();
     const t=e.touches[0];
     candidate={source,x:t.clientX,y:t.clientY,startX:t.clientX,startY:t.clientY,active:false,moved:false,hit:null};
@@ -3665,6 +4094,649 @@ alignScratchHistory();
   },true);
 })();
 
+/* TEST v6.14.15: hold to reorder icons, double tap for options.
+   Tap uses a short delay to distinguish single selection from double tap. */
+(function initMobileIconActions(){
+  const icons=document.getElementById('genres');
+  if(!icons)return;
+  const mobile=()=>window.matchMedia('(max-width:800px)').matches;
+  let hold=null, holdTimer=null, lastTap=null, tapTimer=null, ignoreClickUntil=0;
+  function iconAt(node){
+    const el=node instanceof Element?node.closest('#genres .server'):null;
+    if(!el||el.classList.contains('add')||el.classList.contains('settings'))return null;
+    const index=[...icons.querySelectorAll('.server:not(.add):not(.settings)')].indexOf(el);
+    return index<0?null:{el,index};
+  }
+  function clearHold(){if(holdTimer!==null){clearTimeout(holdTimer);holdTimer=null}}
+  function clearTap(){if(tapTimer!==null){clearTimeout(tapTimer);tapTimer=null}lastTap=null}
+  function cleanup(){clearHold();hold=null;document.body.classList.remove('mobile-icon-moving');clearSortIndicators()}
+  window.cancelMobileIconMove=()=>{cleanup();clearTap()};
+  icons.addEventListener('touchstart',e=>{
+    cleanup();
+    if(!mobile()||!document.body.classList.contains('mobile-list')||e.touches.length!==1)return;
+    const info=iconAt(e.target);if(!info)return;
+    const t=e.touches[0];
+    hold={info,x:t.clientX,y:t.clientY,active:false,hit:null,moved:false};
+    holdTimer=setTimeout(()=>{
+      holdTimer=null;
+      if(!hold)return;
+      clearTap();closeAllMenus();
+      hold.active=true;hold.info.el.classList.add('sort-dragging');
+      document.body.classList.add('mobile-icon-moving');
+      navigator.vibrate?.(10);
+    },420);
+  },{passive:true});
+  icons.addEventListener('touchmove',e=>{
+    if(!hold||e.touches.length!==1)return;
+    const t=e.touches[0];
+    if(!hold.active){
+      if(Math.hypot(t.clientX-hold.x,t.clientY-hold.y)>11)cleanup();
+      return;
+    }
+    if(e.cancelable)e.preventDefault();
+    e.stopImmediatePropagation();
+    hold.moved=true;
+    icons.querySelectorAll('.server.drop-target').forEach(n=>n.classList.remove('drop-target'));
+    const target=iconAt(document.elementFromPoint(t.clientX,t.clientY));
+    hold.hit=target&&target.index!==hold.info.index?target:null;
+    hold.hit?.el.classList.add('drop-target');
+    // Drag near rail edges to reorder icons beyond the visible list.
+    const box=icons.getBoundingClientRect();
+    if(t.clientY<box.top+40)icons.scrollTop-=12;
+    else if(t.clientY>box.bottom-40)icons.scrollTop+=12;
+  },{passive:false});
+  function finish(e,canceled){
+    if(!hold)return;
+    const h=hold;cleanup();
+    if(!h.active)return;
+    if(e.cancelable)e.preventDefault();e.stopImmediatePropagation();
+    ignoreClickUntil=performance.now()+800;
+    mobileGenreSuppressUntil=ignoreClickUntil;
+    if(!canceled&&h.hit)moveGenreByIndex(h.info.index,h.hit.index);
+  }
+  icons.addEventListener('touchend',e=>finish(e,false),{capture:true,passive:false});
+  icons.addEventListener('touchcancel',e=>finish(e,true),{capture:true,passive:false});
+  // Capture synthesized clicks so a single tap still selects its genre,
+  // while two taps open the existing icon edit/delete options.
+  icons.addEventListener('click',e=>{
+    if(!mobile()||!document.body.classList.contains('mobile-list'))return;
+    const info=iconAt(e.target);if(!info)return;
+    e.preventDefault();e.stopImmediatePropagation();
+    if(performance.now()<ignoreClickUntil||performance.now()<mobileGenreSuppressUntil)return;
+    const now=performance.now();
+    if(lastTap&&lastTap.index===info.index&&now-lastTap.time<360){
+      clearTap();ignoreClickUntil=now+450;
+      mobileGenreSuppressUntil=now+450;
+      closeAllMenus();
+      const box=info.el.getBoundingClientRect();
+      openContext(Math.max(72,box.right+8),Math.max(8,box.top),info.index);
+      return;
+    }
+    clearTap();lastTap={index:info.index,time:now};
+    tapTimer=setTimeout(()=>{
+      const selected=lastTap;clearTap();
+      if(!selected||!mobile())return;
+      const current=icons.querySelectorAll('.server:not(.add):not(.settings)')[selected.index];
+      if(current?.onclick)current.onclick({preventDefault(){},stopPropagation(){}});
+    },320);
+  },true);
+  icons.addEventListener('contextmenu',e=>{
+    if(!mobile()||!iconAt(e.target))return;
+    // iOS long-press must not open the native menu or icon options.
+    e.preventDefault();e.stopImmediatePropagation();
+  },true);
+  window.addEventListener('resize',()=>{if(!mobile()){cleanup();clearTap()}});
+})();
+
+/* v6.14.13: tables and drag-range move mode (test only).
+ * Tables are saved as native HTML, with UI widgets excluded from the snapshot.
+ * A move affects a complete DOM line or table block; original rich text stays in nodes.
+ */
+(function initMemoTableAndMove(){
+  const ed=document.getElementById('editor');
+  const insertBtn=document.getElementById('insertMemoTableBtn');
+  const modeBtn=document.getElementById('memoMoveModeBtn');
+  const moveTip=document.getElementById('memoMoveTip');
+  if(!ed||!insertBtn||!modeBtn)return;
+  const mobile=()=>window.matchMedia('(max-width:800px)').matches;
+  let mode=false,selected=new Set(),selectionGesture=null,candidate=null,insertMarker=null,moveHandle=null,lastCaret=null,activeCell=null;
+  const units=()=>[...ed.children].filter(e=>e.classList.contains('memo-move-line')||e.classList.contains('memo-table'));
+  function cleanupTemporary(root){
+    root.querySelectorAll('.memo-table-ui,.memo-move-handle,.memo-drop-marker').forEach(el=>el.remove());
+    root.querySelectorAll('[data-move-selected]').forEach(el=>el.removeAttribute('data-move-selected'));
+    root.classList.remove('memo-move-mode');
+  }
+  // Preserve exact table text and rich-text styling, but not draggable UI controls.
+  const beforePlain=plainEditorHtml;
+  plainEditorHtml=function(){
+    const clone=ed.cloneNode(true);
+    cleanupTemporary(clone);
+    clone.querySelectorAll('.memo-channel-link').forEach(a=>a.replaceWith(document.createTextNode(a.textContent)));
+    // The live editor uses an invisible caret anchor after Enter. It is NOT
+    // part of the user's text and must not enter cloud snapshots / Undo.
+    clone.querySelectorAll('.memo-table th,.memo-table td').forEach(cell=>{
+      const walker=document.createTreeWalker(cell,NodeFilter.SHOW_TEXT);
+      let n;while(n=walker.nextNode())if(n.nodeValue.includes('​'))n.nodeValue=n.nodeValue.replace(/​/g,'');
+    });
+    return clone.innerHTML;
+  };
+  const beforeLoad=loadNote;
+  loadNote=function(){
+    selected.clear();selectionGesture=null;candidate=null;removeMoveHandle();
+    if(insertMarker){insertMarker.remove();insertMarker=null;}
+    beforeLoad();
+    enhanceTables();
+    if(mode&&!mobile()){normalizeLines();paintSelection();}
+  };
+  document.addEventListener('selectionchange',()=>{
+    if(mode)return;
+    const sel=window.getSelection();
+    if(sel&&sel.rangeCount&&ed.contains(sel.anchorNode))lastCaret=sel.getRangeAt(0).cloneRange();
+  });
+  ed.addEventListener('focusin',e=>{
+    if(e.target.closest?.('.memo-table th,.memo-table td'))activeCell=e.target;
+  });
+  function makeCell(tag){
+    const cell=document.createElement(tag);
+    cell.setAttribute('contenteditable','true');
+    // Keep new cells truly empty; a placeholder <br> can survive after typing
+    // and produce the unwanted extra line in the green heading row.
+    return cell;
+  }
+  function makeTable(){
+    const wrap=document.createElement('div');wrap.className='memo-table';
+    wrap.setAttribute('contenteditable','false');wrap.dataset.baseWidth='640';wrap.dataset.scale='1';
+    const frame=document.createElement('div');frame.className='memo-table-frame';
+    const table=document.createElement('table');
+    const cols=document.createElement('colgroup');
+    [22,25,53].forEach(p=>{const col=document.createElement('col');col.style.width=p+'%';cols.appendChild(col);});
+    table.appendChild(cols);
+    const thead=document.createElement('thead'),tr=document.createElement('tr');
+    for(let i=0;i<3;i++)tr.appendChild(makeCell('th'));
+    thead.appendChild(tr);table.appendChild(thead);
+    const body=document.createElement('tbody');
+    for(let r=0;r<3;r++){
+      const row=document.createElement('tr');for(let c=0;c<3;c++)row.appendChild(makeCell('td'));
+      body.appendChild(row);
+    }
+    table.appendChild(body);frame.appendChild(table);wrap.appendChild(frame);
+    return wrap;
+  }
+  function applyTableScale(wrap){
+    const base=Math.max(360,Math.min(1200,Number(wrap.dataset.baseWidth)||640));
+    const scale=Math.max(.55,Math.min(1.6,Number(wrap.dataset.scale)||1));
+    wrap.dataset.baseWidth=String(base);wrap.dataset.scale=String(Math.round(scale*1000)/1000);
+    wrap.style.width=(base*scale)+'px';
+    wrap.style.setProperty('--memo-table-scale',String(scale));
+  }
+  function saveTableChange(kind){saveCurrent();recordMemoEdit(kind||'table');}
+  function addTableRow(wrap){
+    const t=wrap.querySelector('table'),cols=t.querySelectorAll('colgroup col').length;
+    const row=document.createElement('tr');for(let i=0;i<cols;i++)row.appendChild(makeCell('td'));
+    const source=activeCell?.closest('tr');
+    if(source&&source.closest('.memo-table')===wrap&&source.parentElement.tagName==='TBODY')source.after(row);
+    else t.tBodies[0].appendChild(row);
+    enhanceTables();saveTableChange('table-row');
+    // Keep the new-cell focus without Safari's unnecessary scroll jump.
+    try{row.querySelector('td')?.focus({preventScroll:true})}catch(e){row.querySelector('td')?.focus()}
+  }
+  function addTableColumn(wrap){
+    const t=wrap.querySelector('table'),cols=[...t.querySelectorAll('colgroup col')];
+    if(cols.length>=15){openInfoModal('列は最大15列まで追加できます。','列を追加できません');return;}
+    const fraction=100/(cols.length+1);
+    cols.forEach(c=>c.style.width=(Number.parseFloat(c.style.width)*(1-fraction/100))+'%');
+    const col=document.createElement('col');col.style.width=fraction+'%';t.querySelector('colgroup').appendChild(col);
+    t.querySelectorAll('tr').forEach((tr,i)=>tr.appendChild(makeCell(i===0?'th':'td')));
+    enhanceTables();saveTableChange('table-column');
+  }
+  // Always delete only the bottom BODY row, never the green header row.
+  // A table must retain at least one editable data row and one column.
+  function requestDeleteTableRow(wrap){
+    const tbody=wrap.querySelector('table tbody');
+    const rows=[...(tbody?.rows||[])];
+    if(rows.length<=1){openInfoModal('表には最低1行のデータ行を残す必要があります。','行を削除できません');return;}
+    const index=rows.length, target=rows[index-1];
+    const cells=[...target.cells];
+    const filled=cells.filter(c=>c.textContent.trim()||c.querySelector('img,video')).length;
+    const message=`一番下のデータ行（${index}行目）を削除します。\n\n削除するセル：${cells.length}個（入力済み：${filled}個）\n※ この行に入力した文字や書式は削除されます。\n見出し行と上の行は残ります。`;
+    openConfirmModal(message,()=>{
+      if(!wrap.isConnected||!target.isConnected||target.parentElement!==tbody||tbody.rows.length<=1)return;
+      // Reject a stale dialog after another operation has changed the last row.
+      if(tbody.lastElementChild!==target)return;
+      if(activeCell&&target.contains(activeCell))activeCell=null;
+      target.remove();enhanceTables();saveTableChange('table-row-delete');
+    },{title:'行の削除を確認',confirmLabel:'一番下の行を削除する'});
+  }
+  // Remove the rightmost column, preserving the other cells and relative widths.
+  function requestDeleteTableColumn(wrap){
+    const table=wrap.querySelector('table');
+    const colgroup=table?.querySelector('colgroup');
+    const cols=[...(colgroup?.querySelectorAll('col')||[])];
+    if(cols.length<=1){openInfoModal('表には最低1列を残す必要があります。','列を削除できません');return;}
+    const index=cols.length, targetCol=cols[index-1];
+    const rows=[...table.rows];
+    const targetCells=rows.map(r=>r.cells[index-1]);
+    if(targetCells.some(c=>!c))return;
+    const filled=targetCells.filter(c=>c.textContent.trim()||c.querySelector('img,video')).length;
+    const message=`一番右の列（${index}列目）を削除します。\n\n削除するセル：${targetCells.length}個（入力済み：${filled}個）\n※ 見出しセルも含め、この列の文字や書式は削除されます。\n左側の列は残ります。`;
+    openConfirmModal(message,()=>{
+      if(!wrap.isConnected||!targetCol.isConnected||colgroup.lastElementChild!==targetCol||colgroup.children.length<=1)return;
+      // The table may have changed while the dialog was visible.
+      if(rows.some((r,i)=>!r.isConnected||r.cells[index-1]!==targetCells[i]||r.cells.length!==index))return;
+      if(activeCell&&targetCells.some(c=>c.contains(activeCell)))activeCell=null;
+      targetCells.forEach(c=>c.remove());targetCol.remove();
+      // Normalize the remaining percentages without changing their ratios.
+      const remain=[...colgroup.querySelectorAll('col')];
+      const widths=remain.map(c=>Math.max(0,parseFloat(c.style.width)||0));
+      const sum=widths.reduce((a,b)=>a+b,0);
+      remain.forEach((c,i)=>c.style.width=(sum?widths[i]*100/sum:100/remain.length)+'%');
+      enhanceTables();saveTableChange('table-column-delete');
+    },{title:'列の削除を確認',confirmLabel:'一番右の列を削除する'});
+  }
+  function requestDeleteTable(wrap){
+    const rows=wrap.querySelectorAll('tbody tr').length,cols=wrap.querySelectorAll('thead th').length;
+    openConfirmModal(`この表（${cols}列 × ${rows+1}行）を削除します。\n\n※ 表に入力した文字、色、列幅などもすべて削除されます。\n削除対象を確認してください。`,()=>{
+      if(!wrap.isConnected)return;
+      wrap.remove();saveTableChange('table-delete');
+      if(mode){selected.delete(wrap);paintSelection();}
+    },{title:'表の削除を確認',confirmLabel:'表を削除する'});
+  }
+  function addColumnResizers(wrap){
+    const t=wrap.querySelector('table');
+    const cols=[...t.querySelectorAll('colgroup col')],heads=[...t.querySelectorAll('thead th')];
+    heads.slice(0,-1).forEach((head,index)=>{
+      // Keep the editing host completely free of noneditable inline children.
+      // The visible grip comes from th::after and pointer gestures on its edge.
+      head.addEventListener('pointerdown',e=>{
+        if(mode||mobile()||e.button!==0)return;
+        const r=head.getBoundingClientRect();
+        if(e.clientX<r.right-10||e.clientX>r.right+5)return;
+        e.preventDefault();e.stopPropagation();
+        const total=t.getBoundingClientRect().width||640;
+        const first=parseFloat(cols[index].style.width),second=parseFloat(cols[index+1].style.width);
+        const x=e.clientX;
+        head.setPointerCapture?.(e.pointerId);
+        const move=ev=>{
+          const delta=100*(ev.clientX-x)/total;
+          const next=Math.max(8,Math.min(first+second-8,first+delta));
+          cols[index].style.width=next+'%';cols[index+1].style.width=(first+second-next)+'%';
+        };
+        const up=()=>{
+          head.removeEventListener('pointermove',move);head.removeEventListener('pointerup',up);
+          head.removeEventListener('pointercancel',up);
+          try{if(head.hasPointerCapture(e.pointerId))head.releasePointerCapture(e.pointerId)}catch(err){}
+          saveTableChange('table-col-resize');
+        };
+        head.addEventListener('pointermove',move);head.addEventListener('pointerup',up);head.addEventListener('pointercancel',up);
+      });
+    });
+  }
+  function addSizeHandle(wrap){
+    const frame=wrap.querySelector('.memo-table-frame');if(!frame)return;
+    const handle=document.createElement('span');handle.className='memo-table-resize memo-table-ui';
+    handle.title='ドラッグで表全体を縦横同じ倍率で拡大・縮小';
+    handle.setAttribute('contenteditable','false');frame.appendChild(handle);
+    handle.addEventListener('pointerdown',e=>{
+      if(mode||mobile())return;
+      e.preventDefault();e.stopPropagation();
+      handle.setPointerCapture?.(e.pointerId);
+      const x=e.clientX,y=e.clientY,start=Number(wrap.dataset.scale)||1,base=Number(wrap.dataset.baseWidth)||640;
+      const move=ev=>{
+        const delta=((ev.clientX-x)+(ev.clientY-y)*.55)/base;
+        wrap.dataset.scale=String(Math.max(.55,Math.min(1.6,start+delta)));
+        applyTableScale(wrap);
+      };
+      const up=()=>{
+        handle.removeEventListener('pointermove',move);handle.removeEventListener('pointerup',up);
+        handle.removeEventListener('pointercancel',up);saveTableChange('table-scale');
+      };
+      handle.addEventListener('pointermove',move);handle.addEventListener('pointerup',up);handle.addEventListener('pointercancel',up);
+    });
+  }
+  function removeLegacyEmptyLine(cell){
+    // v6.14.7 started every editable table cell with a <br>. When a user typed,
+    // Chromium sometimes kept that initial BR after the text, creating one
+    // unwanted extra line. Only trim that *single trailing* placeholder in a
+    // nonempty single-line cell; preserve intentional multi-line cell content.
+    const children=[...cell.childNodes];
+    if(children.length===1 && children[0].nodeType===1 && children[0].tagName==='BR'){
+      cell.replaceChildren();return;
+    }
+    const last=children.at(-1);
+    if(!last || last.nodeType!==1 || last.tagName!=='BR' || !cell.textContent.trim())return;
+    if(children.some(n=>n!==last&&n.nodeType===1&&(n.tagName==='BR'||['DIV','P'].includes(n.tagName))))return;
+    last.remove();
+  }
+  function enhanceTables(){
+    ed.querySelectorAll('.memo-table').forEach(wrap=>{
+      wrap.querySelectorAll('.memo-table-ui').forEach(x=>x.remove());
+      wrap.setAttribute('contenteditable','false');
+      wrap.querySelectorAll('th,td').forEach(c=>{
+        removeLegacyEmptyLine(c);
+        c.setAttribute('contenteditable',mode?'false':'true');
+      });
+      applyTableScale(wrap);
+      const actions=document.createElement('div');actions.className='memo-table-actions memo-table-ui';actions.setAttribute('contenteditable','false');
+      function stepper(label,add,remove,canRemove){
+        const group=document.createElement('div');group.className='memo-table-stepper';
+        group.setAttribute('role','group');group.setAttribute('aria-label',label+'の追加・削除');
+        const plus=document.createElement('button');plus.type='button';plus.textContent='＋';
+        plus.title=label+'を追加';plus.setAttribute('aria-label',label+'を追加');
+        const text=document.createElement('span');text.className='memo-table-stepper-label';text.textContent=label;
+        const minus=document.createElement('button');minus.type='button';minus.textContent='－';
+        minus.className='memo-table-stepper-minus';minus.title=label+'を削除';minus.setAttribute('aria-label',label+'を削除');
+        // Keep the minimum row/column: no destructive operation is possible.
+        minus.disabled=!canRemove;
+        plus.addEventListener('click',e=>{e.preventDefault();add()});
+        minus.addEventListener('click',e=>{e.preventDefault();remove()});
+        group.append(plus,text,minus);return group;
+      }
+      const rows=wrap.querySelectorAll('tbody tr').length;
+      const cols=wrap.querySelectorAll('colgroup col').length;
+      const rowControls=stepper('行',()=>addTableRow(wrap),()=>requestDeleteTableRow(wrap),rows>1);
+      const colControls=stepper('列',()=>addTableColumn(wrap),()=>requestDeleteTableColumn(wrap),cols>1);
+      const del=document.createElement('button');del.type='button';del.className='table-remove';del.textContent='表を削除';
+      del.addEventListener('click',e=>{e.preventDefault();requestDeleteTable(wrap)});
+      actions.append(rowControls,colControls,del);wrap.appendChild(actions);
+      addColumnResizers(wrap);addSizeHandle(wrap);
+    });
+  }
+  function topChild(node){
+    if(node===ed)return null;
+    let el=node?.nodeType===1?node:node?.parentNode;
+    while(el&&el.parentNode!==ed)el=el.parentNode;
+    return el?.parentNode===ed?el:null;
+  }
+  function insertAtCaret(node){
+    const sel=window.getSelection();let range=null;
+    if(sel?.rangeCount&&ed.contains(sel.anchorNode))range=sel.getRangeAt(0).cloneRange();
+    else if(lastCaret&&ed.contains(lastCaret.startContainer))range=lastCaret.cloneRange();
+    if(!range){ed.appendChild(node);return;}
+    const top=topChild(range.startContainer);
+    if(!top){
+      if(range.startContainer===ed)ed.insertBefore(node,ed.childNodes[range.startOffset]||null);
+      else ed.appendChild(node);
+      return;
+    }
+    if(top.classList?.contains('memo-table')){top.after(node);return;}
+    if(top.nodeType===3){
+      const at=range.startContainer===top?range.startOffset:top.length;
+      const after=top.splitText(Math.max(0,Math.min(at,top.length)));
+      ed.insertBefore(node,after);return;
+    }
+    // Split the current paragraph at the caret so the table can be inserted
+    // between two lines without discarding formatting from either part.
+    try{
+      const remaining=document.createRange();remaining.setStart(range.startContainer,range.startOffset);remaining.setEnd(top,top.childNodes.length);
+      const fragment=remaining.extractContents();
+      const after=top.cloneNode(false);
+      after.appendChild(fragment);
+      top.after(node);
+      if(after.textContent.trim()||after.querySelector('img,br,video'))node.after(after);
+    }catch(e){top.after(node)}
+  }
+  insertBtn.addEventListener('pointerdown',e=>{
+    // Toolbar click normally blurs the editor and loses its caret.
+    e.preventDefault();
+  });
+  insertBtn.addEventListener('click',e=>{
+    e.preventDefault();if(mobile()||mode)return;
+    const t=makeTable();insertAtCaret(t);
+    const after=document.createElement('p');after.appendChild(document.createElement('br'));t.after(after);
+    enhanceTables();saveTableChange('table-insert');
+    // .focus() alone may leave the caret at the editor's former position
+    // (e.g. the right edge of the first green header cell). Explicitly
+    // collapse the Selection at the beginning of the cell.
+    const firstHeader=t.querySelector('thead th');
+    if(firstHeader){
+      firstHeader.focus({preventScroll:true});
+      const caret=document.createRange();
+      caret.selectNodeContents(firstHeader);
+      caret.collapse(true);
+      const selection=window.getSelection();
+      selection.removeAllRanges();selection.addRange(caret);
+      activeCell=firstHeader;
+    }
+  });
+  ed.addEventListener('keydown',e=>{
+    if(e.key!=='Tab'||!e.target.matches?.('.memo-table th,.memo-table td'))return;
+    const table=e.target.closest('table'),cells=[...table.querySelectorAll('th,td')];
+    const i=cells.indexOf(e.target),next=cells[i+(e.shiftKey?-1:1)];
+    if(next){e.preventDefault();next.focus();}
+  });
+  // v6.14.13: IME-safe single-height Enter inside table cells.
+  // Chromium inserts two LFs at a trailing caret, which are rendered as TWO
+  // extra lines until typing again. Keep one LF and an invisible caret anchor.
+  function tableCellForEvent(e){
+    const el=e.target;
+    return el?.closest?.('.memo-table th[contenteditable="true"],.memo-table td[contenteditable="true"]');
+  }
+  function putCellLineBreak(cell){
+    const selection=window.getSelection();
+    if(!selection||!selection.rangeCount)return false;
+    const r=selection.getRangeAt(0).cloneRange();
+    if(!cell.contains(r.startContainer)||!cell.contains(r.endContainer))return false;
+    r.deleteContents();
+    // A trailing LF without a following inline glyph is treated as a hidden
+    // line-break by Chromium; adding a second LF adds TWO line-heights.
+    // One zero-width caret anchor keeps exactly one visible new line while
+    // allowing typing directly on the new line.
+    const newLine=document.createTextNode('\n\u200b');
+    r.insertNode(newLine);
+    const cursor=document.createRange();cursor.setStart(newLine,1);cursor.collapse(true);
+    selection.removeAllRanges();selection.addRange(cursor);
+    // Programmatic insertion does not dispatch input events; notify the same
+    // auto-save, cloud sync and per-note Undo logic as ordinary typing.
+    cell.dispatchEvent(new InputEvent('input',{bubbles:true,composed:true,inputType:'insertLineBreak',data:null}));
+    return true;
+  }
+  ed.addEventListener('keydown',e=>{
+    const cell=tableCellForEvent(e);
+    if(!cell||e.key!=='Enter'||e.isComposing||e.keyCode===229||e.altKey)return;
+    e.preventDefault();e.stopPropagation();putCellLineBreak(cell);
+  },true);
+  // Virtual keyboards and accessibility input can request a paragraph without
+  // dispatching a physical Enter key. Route that through the same algorithm.
+  ed.addEventListener('beforeinput',e=>{
+    if(e.inputType!=='insertParagraph'&&e.inputType!=='insertLineBreak')return;
+    const cell=tableCellForEvent(e);
+    if(!cell||e.isComposing)return;
+    e.preventDefault();putCellLineBreak(cell);
+  },true);
+  // Keep a truly empty cell empty after deleting its last character.
+  // Do not rewrite nonempty content or multi-line content, and never normalize
+  // during Japanese input composition.
+  ed.addEventListener('input',e=>{
+    const cell=e.target.closest?.('.memo-table th,.memo-table td');
+    if(!cell||e.isComposing||!e.inputType?.startsWith('delete'))return;
+    if(cell.childNodes.length===1&&cell.firstChild?.nodeName==='BR'){
+      cell.replaceChildren();
+      const r=document.createRange();r.selectNodeContents(cell);r.collapse(true);
+      const s=window.getSelection();s.removeAllRanges();s.addRange(r);
+    }
+  },true); // capture: normalize before the existing save + undo listeners run
+  // The existing memo undo handler listens to the editor itself. Table cells
+  // are separate editing hosts, so include them in the same history shortcuts.
+  ed.addEventListener('keydown',e=>{
+    if(!e.target.matches?.('.memo-table th,.memo-table td'))return;
+    if(!(e.ctrlKey||e.metaKey)||e.altKey)return;
+    const k=e.key.toLowerCase();
+    if(k==='z'&&!e.shiftKey){e.preventDefault();e.stopPropagation();undoMemoEdit();}
+    else if(k==='y'||(k==='z'&&e.shiftKey)){e.preventDefault();e.stopPropagation();redoMemoEdit();}
+  },true);
+  function lineFromBlock(block){
+    if(block.classList.contains('memo-move-line'))return;
+    block.classList.add('memo-move-line');
+  }
+  function splitLineOnDirectBreaks(block){
+    const brs=[...block.childNodes].filter(n=>n.nodeType===1&&n.tagName==='BR');
+    if(!brs.length){lineFromBlock(block);return;}
+    const pieces=[];let segment=block.cloneNode(false);
+    for(const n of [...block.childNodes]){
+      if(n.nodeType===1&&n.tagName==='BR'){
+        if(!segment.hasChildNodes())segment.appendChild(document.createElement('br'));
+        pieces.push(segment);segment=block.cloneNode(false);n.remove();
+      }else segment.appendChild(n);
+    }
+    if(segment.hasChildNodes())pieces.push(segment);
+    else if(!pieces.length){segment.appendChild(document.createElement('br'));pieces.push(segment)}
+    pieces.forEach(p=>{lineFromBlock(p);block.before(p)});block.remove();
+  }
+  function normalizeLines(){
+    let pending=null;
+    const flush=(forceEmpty=false)=>{
+      if(pending){if(!pending.hasChildNodes())pending.appendChild(document.createElement('br'));pending=null;}
+      else if(forceEmpty){const d=document.createElement('div');d.className='memo-move-line';d.appendChild(document.createElement('br'));ed.appendChild(d);}
+    };
+    for(const node of [...ed.childNodes]){
+      if(node.nodeType===1&&node.classList.contains('memo-drop-marker'))continue;
+      if(node.nodeType===1&&node.classList.contains('memo-table')){flush();continue;}
+      if(node.nodeType===1&&['P','DIV','H1','H2','H3','H4','H5','H6','BLOCKQUOTE','LI'].includes(node.tagName)){
+        flush();splitLineOnDirectBreaks(node);continue;
+      }
+      if(node.nodeType===1&&node.tagName==='BR'){
+        if(pending)pending=null;
+        else {const d=document.createElement('div');d.className='memo-move-line';node.before(d);d.appendChild(document.createElement('br'));}
+        node.remove();continue;
+      }
+      // Whitespace can be an intentional part of a memo: never discard it.
+      if(!pending){pending=document.createElement('div');pending.className='memo-move-line';node.before(pending);}
+      pending.appendChild(node);
+    }
+    flush();
+  }
+  function paintSelection(){
+    for(const u of units()){
+      if(selected.has(u))u.dataset.moveSelected='1';else u.removeAttribute('data-move-selected');
+    }
+  }
+  function removeMoveHandle(){
+    if(moveHandle){moveHandle.remove();moveHandle=null;}
+  }
+  function updateMoveHandle(){
+    removeMoveHandle();
+    if(!mode||mobile()||!selected.size||selectionGesture||candidate)return;
+    const ordered=units().filter(u=>selected.has(u));
+    if(!ordered.length)return;
+    const start=ordered[0].getBoundingClientRect(),end=ordered.at(-1).getBoundingClientRect();
+    const bounds=ed.getBoundingClientRect();
+    const btn=document.createElement('button');btn.type='button';btn.className='memo-move-handle memo-table-ui';
+    btn.setAttribute('contenteditable','false');
+    btn.setAttribute('aria-label','選択した文章・表を移動');
+    btn.title='上下にドラッグして選択範囲を移動';
+    btn.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v18M6 9l6-6 6 6M6 15l6 6 6-6"/></svg>';
+    btn.style.top=(Math.max(0,(start.top+end.bottom)/2-bounds.top-16+ed.scrollTop))+'px';
+    ed.appendChild(btn);moveHandle=btn;
+    btn.addEventListener('pointerdown',e=>{
+      if(e.button!==0||!mode)return;
+      e.preventDefault();e.stopPropagation();
+      candidate={startX:e.clientX,startY:e.clientY,dragging:false,target:null,pointerId:e.pointerId};
+      btn.setPointerCapture?.(e.pointerId);
+    });
+  }
+  // Choose complete newline-delimited blocks rather than screen-wrapped lines.
+  // This mirrors dragging a text selection but retains each block's rich HTML.
+  function unitUnderPointer(e){
+    const at=document.elementFromPoint(e.clientX,e.clientY);
+    const direct=at?.closest?.('.memo-move-line,.memo-table');
+    if(direct&&ed.contains(direct))return direct;
+    const all=units();if(!all.length)return null;
+    const rect=ed.getBoundingClientRect();
+    if(e.clientX<rect.left-48||e.clientX>rect.right+30)return null;
+    let closest=all[0],distance=Infinity;
+    for(const u of all){
+      const box=u.getBoundingClientRect();
+      const d=Math.max(box.top-e.clientY,0,e.clientY-box.bottom);
+      if(d<distance){closest=u;distance=d;}
+    }
+    return closest;
+  }
+  function selectRange(anchor,end){
+    const all=units(),a=all.indexOf(anchor),b=all.indexOf(end);
+    if(a<0||b<0)return;
+    selected=new Set(all.slice(Math.min(a,b),Math.max(a,b)+1));
+    paintSelection();
+  }
+  function removeMarker(){if(insertMarker){insertMarker.remove();insertMarker=null;}}
+  function endMode(){
+    mode=false;selected.clear();selectionGesture=null;candidate=null;removeMarker();removeMoveHandle();
+    ed.classList.remove('memo-move-mode');ed.contentEditable='true';
+    ed.querySelectorAll('[data-move-selected]').forEach(n=>n.removeAttribute('data-move-selected'));
+    ed.querySelectorAll('.memo-table th,.memo-table td').forEach(c=>c.setAttribute('contenteditable','true'));
+    modeBtn.setAttribute('aria-pressed','false');modeBtn.title='文章や表を並べ替える';
+    if(moveTip)moveTip.hidden=true;
+  }
+  function startMode(){
+    if(mobile())return;
+    saveCurrent();mode=true;ed.classList.add('memo-move-mode');ed.contentEditable='false';
+    ed.querySelectorAll('.memo-table th,.memo-table td').forEach(c=>c.setAttribute('contenteditable','false'));
+    normalizeLines();selected.clear();paintSelection();removeMoveHandle();
+    modeBtn.setAttribute('aria-pressed','true');modeBtn.title='移動モードを終了';
+    if(moveTip)moveTip.hidden=false;
+  }
+  modeBtn.addEventListener('click',e=>{e.preventDefault();if(mode)endMode();else startMode();});
+  ed.addEventListener('pointerdown',e=>{
+    if(!mode||mobile()||e.button!==0||candidate||e.target.closest?.('.memo-move-handle'))return;
+    const unit=e.target.closest?.('.memo-move-line,.memo-table');
+    if(!unit||!ed.contains(unit)){
+      selected.clear();paintSelection();removeMoveHandle();return;
+    }
+    // Prevent browser text selection; highlight the complete logical lines ourselves.
+    e.preventDefault();
+    selectionGesture={anchor:unit,pointerId:e.pointerId};
+    selectRange(unit,unit);
+    removeMoveHandle();
+    try{ed.setPointerCapture(e.pointerId);}catch(err){}
+  });
+  // Moving the arrow moves intact DOM blocks, so font sizes, colors and
+  // table cells remain unchanged. Moving over text first selects full lines.
+  ed.addEventListener('pointermove',e=>{
+    if(!mode)return;
+    if(selectionGesture){
+      if(e.pointerId!==selectionGesture.pointerId)return;
+      const end=unitUnderPointer(e);
+      if(end)selectRange(selectionGesture.anchor,end);
+      return;
+    }
+    if(!candidate||e.pointerId!==candidate.pointerId)return;
+    if(!candidate.dragging&&Math.hypot(e.clientX-candidate.startX,e.clientY-candidate.startY)<7)return;
+    candidate.dragging=true;
+    const target=unitUnderPointer(e);
+    if(!target||selected.has(target))return;
+    const rect=target.getBoundingClientRect();
+    const before=e.clientY<rect.top+rect.height/2;
+    if(!insertMarker){insertMarker=document.createElement('div');insertMarker.className='memo-drop-marker memo-table-ui';ed.appendChild(insertMarker);}
+    // Overlay the green insertion line instead of inserting an in-flow block.
+    // An in-flow marker pushes lines down and can change the drop destination.
+    const editorTop=ed.getBoundingClientRect().top;
+    insertMarker.style.top=((before?rect.top:rect.bottom)-editorTop+ed.scrollTop-1.5)+'px';
+    candidate.target=target;candidate.before=before;
+  });
+  ed.addEventListener('pointerup',e=>{
+    if(selectionGesture&&e.pointerId===selectionGesture.pointerId){
+      const end=unitUnderPointer(e);
+      if(end)selectRange(selectionGesture.anchor,end);
+      selectionGesture=null;
+      try{if(ed.hasPointerCapture(e.pointerId))ed.releasePointerCapture(e.pointerId);}catch(err){}
+      updateMoveHandle();return;
+    }
+    if(!candidate||e.pointerId!==candidate.pointerId)return;
+    const c=candidate;candidate=null;
+    if(c.dragging&&c.target&&insertMarker){
+      const moving=units().filter(u=>selected.has(u));
+      const fragment=document.createDocumentFragment();moving.forEach(u=>fragment.appendChild(u));
+      if(c.before)c.target.before(fragment);else c.target.after(fragment);
+      saveTableChange('move');
+    }
+    removeMarker();paintSelection();updateMoveHandle();
+  });
+  ed.addEventListener('pointercancel',()=>{
+    selectionGesture=null;candidate=null;removeMarker();paintSelection();updateMoveHandle();
+  });
+  document.addEventListener('keydown',e=>{if(mode&&e.key==='Escape')endMode();});
+  window.addEventListener('resize',()=>{if(mode&&mobile())endMode();else if(mode)updateMoveHandle();});
+  enhanceTables();
+})();
 
 </script>
 </body>

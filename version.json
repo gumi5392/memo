@@ -1,5 +1,5 @@
 {
-  "version": "6.15.1",
-  "build": "6.15.1",
-  "channel": "stable"
+  "version": "6.16.0",
+  "build": "6.16.0",
+  "channel": "production"
 }
