@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#2f2419">
-<link rel="manifest" href="manifest.webmanifest?v=61416">
+<link rel="manifest" href="manifest.webmanifest?v=61417">
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=690">
 <title>メモ帳テスト</title>
 <style>
@@ -645,6 +645,15 @@ body.mobile-sort-active .app>.sidebar .sidebar-body,body.mobile-sort-active .app
 .memo-table-actions button{background:var(--panel2);border:1px solid var(--line);color:var(--text);padding:6px 10px;border-radius:7px;font-size:12px;cursor:pointer}
 .memo-table-actions button:hover{background:var(--hover)}
 .memo-table-actions .table-remove{margin-left:auto;color:var(--danger);border-color:#bd918c;background:transparent}
+/* v6.14.17: compact, independent add/remove controls for table rows and columns. */
+.memo-table-stepper{display:inline-flex;align-items:stretch;overflow:hidden;border:1px solid var(--line);border-radius:8px;background:var(--panel2);min-height:36px}
+.memo-table-actions .memo-table-stepper button{min-width:36px;margin:0;padding:6px 10px;border:0;border-radius:0;background:transparent;font-weight:750;font-size:17px;line-height:1.15;touch-action:manipulation}
+.memo-table-actions .memo-table-stepper button:hover:not(:disabled){background:var(--hover)}
+.memo-table-actions .memo-table-stepper button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.memo-table-actions .memo-table-stepper button:disabled{opacity:.35;cursor:not-allowed}
+.memo-table-actions .memo-table-stepper .memo-table-stepper-minus{color:var(--danger)}
+.memo-table-stepper-label{display:flex;align-items:center;justify-content:center;min-width:30px;padding:0 7px;font-size:13px;font-weight:700;border-inline:1px solid var(--line);white-space:nowrap;user-select:none}
+
 .memo-table-resize{position:absolute;right:-4px;bottom:-4px;width:15px;height:15px;border-radius:4px;background:var(--accent);border:2px solid #f5efe2;cursor:nwse-resize;z-index:4;touch-action:none}
 /* v6.14.13: The width grip is a CSS pseudo-element, NOT a DOM child of
    contenteditable <th>. A noneditable child inside an empty editing host
@@ -674,10 +683,13 @@ body[data-theme="dark"] .editor.memo-move-mode [data-move-selected="1"]{backgrou
   .memo-insert-table-btn,.memo-move-mode-btn,.memo-move-handle,.memo-col-resizer,.memo-table-resize{display:none!important}
   .editor.memo-move-mode{padding-left:0}
   .memo-table{width:100%!important;max-width:100%;margin:12px 0}
-  .memo-table th,.memo-table td{padding:5px 7px;font-size:13px;min-width:0}
+  /* Safari auto-zooms focused contenteditable fields smaller than 16px. */
+  .memo-table th,.memo-table td{padding:5px 7px;font-size:16px!important;min-width:0;-webkit-text-size-adjust:100%}
   .memo-table th::after{display:none}
-  .memo-table-actions{gap:5px}.memo-table-actions button{padding:7px;font-size:11px}
-  .memo-table-actions .table-remove{margin-left:0}
+  .memo-table-actions{gap:8px}.memo-table-actions button{padding:7px;font-size:12px}
+  .memo-table-actions .memo-table-stepper button{min-width:40px;min-height:42px;font-size:19px;padding:7px 9px}
+  .memo-table-actions .memo-table-stepper-label{font-size:14px}
+  .memo-table-actions .table-remove{margin-left:0;min-height:42px}
 }
 
 #memoMoveTip[hidden]{display:none!important}
@@ -686,7 +698,7 @@ body[data-theme="dark"] #memoMoveTip{background:#21362b;color:#bce0c7;border-col
 @media(max-width:800px){#memoMoveTip{display:none!important}}
 
 
-/* TEST v6.14.15–16: viewport-safe editing, native selection and icon actions. */
+/* TEST v6.14.15–17: viewport-safe editing, native selection and icon actions. */
 .mobile-genre-move-action,.mobile-icon-move-hint{display:none!important}
 @media(max-width:800px){
   html{-webkit-text-size-adjust:100%;}
@@ -929,7 +941,7 @@ body[data-theme="dark"] #memoMoveTip{background:#21362b;color:#bce0c7;border-col
       <button class="theme-option dark" id="themeDark"><span class="preview"><span class="p-side"></span><span class="p-main"></span></span><strong>ダーク</strong><span>これまでの配色</span></button>
     </div>
     <div class="app-update-settings" aria-live="polite">
-      <div class="app-update-heading"><strong>アプリの更新</strong><span id="appBuildLabel">テスト v6.14.16</span></div>
+      <div class="app-update-heading"><strong>アプリの更新</strong><span id="appBuildLabel">テスト v6.14.17</span></div>
       <p id="appUpdateStatus">更新情報を確認しています…</p>
       <p id="appUpdateEnvironment" class="app-update-environment" aria-live="polite"></p>
       <div class="app-update-actions">
@@ -3526,7 +3538,7 @@ normalizeCategories(currentGenre().categories);if(!data.activeCategoryId)data.ac
 /* TEST v6.14.13: Safe iPhone home-screen PWA updates (no icon re-add). */
 (function(){
  'use strict';
- const INSTALLED_BUILD='6.14.16';
+ const INSTALLED_BUILD='6.14.17';
  const CHECK_INTERVAL_MS=3*60*1000;
  const status=document.getElementById('appUpdateStatus');
  const buildLabel=document.getElementById('appBuildLabel');
@@ -4280,7 +4292,9 @@ alignScratchHistory();
     const source=activeCell?.closest('tr');
     if(source&&source.closest('.memo-table')===wrap&&source.parentElement.tagName==='TBODY')source.after(row);
     else t.tBodies[0].appendChild(row);
-    enhanceTables();saveTableChange('table-row');row.querySelector('td')?.focus();
+    enhanceTables();saveTableChange('table-row');
+    // Keep the new-cell focus without Safari's unnecessary scroll jump.
+    try{row.querySelector('td')?.focus({preventScroll:true})}catch(e){row.querySelector('td')?.focus()}
   }
   function addTableColumn(wrap){
     const t=wrap.querySelector('table'),cols=[...t.querySelectorAll('colgroup col')];
@@ -4290,6 +4304,50 @@ alignScratchHistory();
     const col=document.createElement('col');col.style.width=fraction+'%';t.querySelector('colgroup').appendChild(col);
     t.querySelectorAll('tr').forEach((tr,i)=>tr.appendChild(makeCell(i===0?'th':'td')));
     enhanceTables();saveTableChange('table-column');
+  }
+  // Always delete only the bottom BODY row, never the green header row.
+  // A table must retain at least one editable data row and one column.
+  function requestDeleteTableRow(wrap){
+    const tbody=wrap.querySelector('table tbody');
+    const rows=[...(tbody?.rows||[])];
+    if(rows.length<=1){openInfoModal('表には最低1行のデータ行を残す必要があります。','行を削除できません');return;}
+    const index=rows.length, target=rows[index-1];
+    const cells=[...target.cells];
+    const filled=cells.filter(c=>c.textContent.trim()||c.querySelector('img,video')).length;
+    const message=`一番下のデータ行（${index}行目）を削除します。\n\n削除するセル：${cells.length}個（入力済み：${filled}個）\n※ この行に入力した文字や書式は削除されます。\n見出し行と上の行は残ります。`;
+    openConfirmModal(message,()=>{
+      if(!wrap.isConnected||!target.isConnected||target.parentElement!==tbody||tbody.rows.length<=1)return;
+      // Reject a stale dialog after another operation has changed the last row.
+      if(tbody.lastElementChild!==target)return;
+      if(activeCell&&target.contains(activeCell))activeCell=null;
+      target.remove();enhanceTables();saveTableChange('table-row-delete');
+    },{title:'行の削除を確認',confirmLabel:'一番下の行を削除する'});
+  }
+  // Remove the rightmost column, preserving the other cells and relative widths.
+  function requestDeleteTableColumn(wrap){
+    const table=wrap.querySelector('table');
+    const colgroup=table?.querySelector('colgroup');
+    const cols=[...(colgroup?.querySelectorAll('col')||[])];
+    if(cols.length<=1){openInfoModal('表には最低1列を残す必要があります。','列を削除できません');return;}
+    const index=cols.length, targetCol=cols[index-1];
+    const rows=[...table.rows];
+    const targetCells=rows.map(r=>r.cells[index-1]);
+    if(targetCells.some(c=>!c))return;
+    const filled=targetCells.filter(c=>c.textContent.trim()||c.querySelector('img,video')).length;
+    const message=`一番右の列（${index}列目）を削除します。\n\n削除するセル：${targetCells.length}個（入力済み：${filled}個）\n※ 見出しセルも含め、この列の文字や書式は削除されます。\n左側の列は残ります。`;
+    openConfirmModal(message,()=>{
+      if(!wrap.isConnected||!targetCol.isConnected||colgroup.lastElementChild!==targetCol||colgroup.children.length<=1)return;
+      // The table may have changed while the dialog was visible.
+      if(rows.some((r,i)=>!r.isConnected||r.cells[index-1]!==targetCells[i]||r.cells.length!==index))return;
+      if(activeCell&&targetCells.some(c=>c.contains(activeCell)))activeCell=null;
+      targetCells.forEach(c=>c.remove());targetCol.remove();
+      // Normalize the remaining percentages without changing their ratios.
+      const remain=[...colgroup.querySelectorAll('col')];
+      const widths=remain.map(c=>Math.max(0,parseFloat(c.style.width)||0));
+      const sum=widths.reduce((a,b)=>a+b,0);
+      remain.forEach((c,i)=>c.style.width=(sum?widths[i]*100/sum:100/remain.length)+'%');
+      enhanceTables();saveTableChange('table-column-delete');
+    },{title:'列の削除を確認',confirmLabel:'一番右の列を削除する'});
   }
   function requestDeleteTable(wrap){
     const rows=wrap.querySelectorAll('tbody tr').length,cols=wrap.querySelectorAll('thead th').length;
@@ -4375,13 +4433,27 @@ alignScratchHistory();
       });
       applyTableScale(wrap);
       const actions=document.createElement('div');actions.className='memo-table-actions memo-table-ui';actions.setAttribute('contenteditable','false');
-      const row=document.createElement('button');row.type='button';row.textContent='＋ 行を追加';
-      const col=document.createElement('button');col.type='button';col.textContent='＋ 列を追加';
+      function stepper(label,add,remove,canRemove){
+        const group=document.createElement('div');group.className='memo-table-stepper';
+        group.setAttribute('role','group');group.setAttribute('aria-label',label+'の追加・削除');
+        const plus=document.createElement('button');plus.type='button';plus.textContent='＋';
+        plus.title=label+'を追加';plus.setAttribute('aria-label',label+'を追加');
+        const text=document.createElement('span');text.className='memo-table-stepper-label';text.textContent=label;
+        const minus=document.createElement('button');minus.type='button';minus.textContent='－';
+        minus.className='memo-table-stepper-minus';minus.title=label+'を削除';minus.setAttribute('aria-label',label+'を削除');
+        // Keep the minimum row/column: no destructive operation is possible.
+        minus.disabled=!canRemove;
+        plus.addEventListener('click',e=>{e.preventDefault();add()});
+        minus.addEventListener('click',e=>{e.preventDefault();remove()});
+        group.append(plus,text,minus);return group;
+      }
+      const rows=wrap.querySelectorAll('tbody tr').length;
+      const cols=wrap.querySelectorAll('colgroup col').length;
+      const rowControls=stepper('行',()=>addTableRow(wrap),()=>requestDeleteTableRow(wrap),rows>1);
+      const colControls=stepper('列',()=>addTableColumn(wrap),()=>requestDeleteTableColumn(wrap),cols>1);
       const del=document.createElement('button');del.type='button';del.className='table-remove';del.textContent='表を削除';
-      row.addEventListener('click',e=>{e.preventDefault();addTableRow(wrap)});
-      col.addEventListener('click',e=>{e.preventDefault();addTableColumn(wrap)});
       del.addEventListener('click',e=>{e.preventDefault();requestDeleteTable(wrap)});
-      actions.append(row,col,del);wrap.appendChild(actions);
+      actions.append(rowControls,colControls,del);wrap.appendChild(actions);
       addColumnResizers(wrap);addSizeHandle(wrap);
     });
   }

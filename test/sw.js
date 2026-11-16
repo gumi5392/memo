@@ -1,5 +1,5 @@
-/* TEST-only PWA network-first update worker. v6.14.16 */
-const MEMO_SW_BUILD='6.14.16-test.1';
+/* TEST-only PWA network-first update worker. v6.14.17 */
+const MEMO_SW_BUILD='6.14.17-test.1';
 const TEST_CACHE_PREFIX='memo-test-only-';
 self.addEventListener('install',event=>{
   event.waitUntil(self.skipWaiting());
