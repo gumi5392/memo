@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#2f2419">
-<link rel="manifest" href="manifest.webmanifest?v=61415">
+<link rel="manifest" href="manifest.webmanifest?v=61416">
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=690">
 <title>メモ帳テスト</title>
 <style>
@@ -686,14 +686,15 @@ body[data-theme="dark"] #memoMoveTip{background:#21362b;color:#bce0c7;border-col
 @media(max-width:800px){#memoMoveTip{display:none!important}}
 
 
-/* TEST v6.14.15: viewport-safe iPhone editing, native selection and icon actions. */
+/* TEST v6.14.15–16: viewport-safe editing, native selection and icon actions. */
 .mobile-genre-move-action,.mobile-icon-move-hint{display:none!important}
 @media(max-width:800px){
   html{-webkit-text-size-adjust:100%;}
   /* Contain the app in iOS's *visible* viewport even after keyboard panning.
      Only the memo and scratch text areas scroll; both title bars stay on top. */
   .app,body.mobile-list .app{
-    position:fixed!important;left:0;right:0;top:var(--memo-mobile-visual-top,0px);
+    position:fixed!important;left:0;right:0;top:0!important;
+    transform:translate3d(0,var(--memo-mobile-visual-top,0px),0);
     height:var(--memo-mobile-viewport,100dvh)!important;
     max-height:var(--memo-mobile-viewport,100dvh)!important;
     min-height:0!important;overflow:hidden;
@@ -732,11 +733,18 @@ body[data-theme="dark"] #memoMoveTip{background:#21362b;color:#bce0c7;border-col
   body.mobile-icon-moving #genres .server.mobile-icon-move-source{opacity:.65;}
 }
 
-/* TEST v6.14.15: isolate editing scroll areas during keyboard resizing. */
+/* TEST v6.14.16: keep the title bars outside the two text scrollers. */
 @media(max-width:800px){
-  #scratchText{flex:1 1 auto;height:100%;overflow-y:auto;overscroll-behavior-y:contain;}
+  .app>.main{overflow:hidden;overscroll-behavior:none;}
+  .app>.main>.topbar,
+  .app>.main>.memo-workspace>.scratch-panel>.scratch-header{
+    position:relative;flex-shrink:0;z-index:16;
+  }
   .app>.main>.memo-workspace>.scratch-panel>.scratch-content{min-height:0;overflow:hidden;}
-  .app>.main>.topbar,.scratch-header{backface-visibility:hidden;transform:translateZ(0);}
+  #scratchText{
+    flex:1 1 auto;height:100%;min-height:0;overflow-y:auto;
+    overscroll-behavior-y:contain;scroll-padding-block:18px;
+  }
   #editor,#scratchText{touch-action:pan-y;}
 }
 </style>
@@ -921,7 +929,7 @@ body[data-theme="dark"] #memoMoveTip{background:#21362b;color:#bce0c7;border-col
       <button class="theme-option dark" id="themeDark"><span class="preview"><span class="p-side"></span><span class="p-main"></span></span><strong>ダーク</strong><span>これまでの配色</span></button>
     </div>
     <div class="app-update-settings" aria-live="polite">
-      <div class="app-update-heading"><strong>アプリの更新</strong><span id="appBuildLabel">テスト v6.14.15</span></div>
+      <div class="app-update-heading"><strong>アプリの更新</strong><span id="appBuildLabel">テスト v6.14.16</span></div>
       <p id="appUpdateStatus">更新情報を確認しています…</p>
       <p id="appUpdateEnvironment" class="app-update-environment" aria-live="polite"></p>
       <div class="app-update-actions">
@@ -3518,7 +3526,7 @@ normalizeCategories(currentGenre().categories);if(!data.activeCategoryId)data.ac
 /* TEST v6.14.13: Safe iPhone home-screen PWA updates (no icon re-add). */
 (function(){
  'use strict';
- const INSTALLED_BUILD='6.14.15';
+ const INSTALLED_BUILD='6.14.16';
  const CHECK_INTERVAL_MS=3*60*1000;
  const status=document.getElementById('appUpdateStatus');
  const buildLabel=document.getElementById('appBuildLabel');
@@ -3747,19 +3755,56 @@ normalizeCategories(currentGenre().categories);if(!data.activeCategoryId)data.ac
   let frame=0,caretFrame=0,keyboardOpen=false;
   let lastFullHeight=Math.max(window.innerHeight,document.documentElement.clientHeight,visual?.height||0);
   function editing(){return document.activeElement===edit || document.activeElement===scratch || document.activeElement?.id==='noteTitle'}
+  // iOS does not always scroll the internal textarea when the keyboard opens.
+  // Measure the selected insertion point in a temporary text-layout mirror and
+  // adjust only textarea.scrollTop (never the page or the outer panel).
+  function keepScratchCaretVisible(){
+    if(!keyboardOpen||document.activeElement!==scratch)return;
+    if(scratch.selectionStart!==scratch.selectionEnd)return; // preserve selection gestures
+    const pos=scratch.selectionStart;
+    const style=getComputedStyle(scratch);
+    const width=scratch.getBoundingClientRect().width;
+    if(width<40||scratch.clientHeight<45)return;
+    const mirror=document.createElement('div');
+    mirror.setAttribute('aria-hidden','true');
+    Object.assign(mirror.style,{
+      position:'absolute',left:'-20000px',top:'0',visibility:'hidden',
+      pointerEvents:'none',boxSizing:'border-box',margin:'0',height:'auto',
+      width:width+'px',borderStyle:'solid',borderColor:'transparent',
+      whiteSpace:'pre-wrap',overflowWrap:'break-word',overflow:'hidden'
+    });
+    for(const key of ['fontFamily','fontSize','fontWeight','fontStyle','lineHeight',
+      'letterSpacing','wordSpacing','textAlign','textIndent','textTransform',
+      'direction','tabSize','wordBreak','paddingTop','paddingRight',
+      'paddingBottom','paddingLeft','borderTopWidth','borderRightWidth',
+      'borderBottomWidth','borderLeftWidth'])mirror.style[key]=style[key];
+    // A zero-width character also measures the caret following a final newline.
+    mirror.appendChild(document.createTextNode(scratch.value.slice(0,pos)));
+    const marker=document.createElement('span');
+    marker.textContent='\u200b';
+    mirror.appendChild(marker);
+    document.body.appendChild(mirror);
+    const caretTop=marker.getBoundingClientRect().top-mirror.getBoundingClientRect().top;
+    mirror.remove();
+    if(!Number.isFinite(caretTop))return;
+    const lineHeight=parseFloat(style.lineHeight)||parseFloat(style.fontSize)*1.8;
+    const padTop=parseFloat(style.paddingTop)||0;
+    const padBottom=parseFloat(style.paddingBottom)||0;
+    const visibleTop=scratch.scrollTop+padTop+9;
+    const visibleBottom=scratch.scrollTop+scratch.clientHeight-padBottom-lineHeight-14;
+    if(caretTop>visibleBottom){
+      scratch.scrollTop+=caretTop-visibleBottom;
+    }else if(caretTop<visibleTop){
+      scratch.scrollTop-=visibleTop-caretTop;
+    }
+  }
   // Never call element.scrollIntoView(): on iPhone that can pan the whole PWA
   // and temporarily move the memo header outside the visible viewport.
   function ensureCaretVisible(){
     caretFrame=0;
     if(!media.matches||!editing()||!keyboardOpen)return;
     if(document.activeElement===scratch){
-      // The textarea is the scroll container for its own selection and must
-      // remain entirely above the keyboard, even when focused near its end.
-      const bounds=scratch.getBoundingClientRect();
-      const panel=document.querySelector('.scratch-content')?.getBoundingClientRect();
-      if(panel && bounds.bottom>panel.bottom+1){
-        scratch.style.maxHeight=Math.max(90,Math.floor(panel.bottom-bounds.top))+'px';
-      }
+      keepScratchCaretVisible();
       return;
     }
     if(document.activeElement!==edit)return;
@@ -3789,9 +3834,17 @@ normalizeCategories(currentGenre().categories);if(!data.activeCategoryId)data.ac
       const baseline=Math.max(lastFullHeight,candidate);
       keyboardOpen=visible<baseline-110;
       if(keyboardOpen){
-        document.documentElement.style.setProperty('--memo-mobile-viewport',visible+'px');
-        // Visual viewport can be panned by iOS when focusing deep in long notes.
-        document.documentElement.style.setProperty('--memo-mobile-visual-top',Math.max(0,Math.round(visual.offsetTop||0))+'px');
+        // Resize the inner scroll areas but do not reflow the header's top offset.
+        const viewportSize=visible+'px';
+        if(document.documentElement.style.getPropertyValue('--memo-mobile-viewport')!==viewportSize){
+          document.documentElement.style.setProperty('--memo-mobile-viewport',viewportSize);
+        }
+        // Compensate for a visual-viewport pan via compositor translation instead
+        // of changing the app's layout top, which caused the title bar to jump.
+        const panTop=Math.max(0,Math.round(visual.offsetTop||0))+'px';
+        if(document.documentElement.style.getPropertyValue('--memo-mobile-visual-top')!==panTop){
+          document.documentElement.style.setProperty('--memo-mobile-visual-top',panTop);
+        }
       }else{
         document.documentElement.style.removeProperty('--memo-mobile-viewport');
         document.documentElement.style.removeProperty('--memo-mobile-visual-top');
@@ -3815,11 +3868,25 @@ normalizeCategories(currentGenre().categories);if(!data.activeCategoryId)data.ac
     if(!media.matches||!e.target.closest('#editor,#noteTitle,#scratchText'))return;
     scheduleLayout();
     // iOS emits several asynchronous keyboard/caret adjustments after focus.
-    for(const delay of [60,180,360,650])setTimeout(()=>{if(editing()){scheduleLayout();scheduleCaret()}},delay);
+    for(const delay of [60,180,360,650,900])setTimeout(()=>{
+      if(editing()){
+        scheduleLayout();
+        // Run after the pending viewport layout has been applied.
+        requestAnimationFrame(scheduleCaret);
+      }
+    },delay);
   });
   document.addEventListener('selectionchange',scheduleCaret);
   edit.addEventListener('input',scheduleCaret);
   scratch.addEventListener('input',()=>{scheduleLayout();scheduleCaret()});
+  // A tap inside an already-focused textarea can move the caret without input.
+  // Recheck it after native iOS selection and keyboard animations have settled.
+  for(const eventName of ['click','keyup','select','touchend','compositionend']){
+    scratch.addEventListener(eventName,()=>{
+      scheduleCaret();
+      if(eventName==='touchend')requestAnimationFrame(scheduleCaret);
+    });
+  }
   document.addEventListener('focusout',()=>setTimeout(scheduleLayout,120));
   updateMobileLayout();
 })();
